@@ -33,6 +33,33 @@ body {
   line-height: 1.5;
   min-height: 100vh;
 }
+.beta-banner {
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.beta-banner strong {
+  font-weight: 600;
+}
+
+.beta-banner a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+@media (min-width: 640px) {
+  .beta-banner {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
 
 /* Główny kontener – „ekran” aplikacji */
 main {
@@ -382,4 +409,29 @@ footer {
     width: 64px;
     height: 64px;
   }
+}
+#about-section {
+  margin-top: 32px;
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  border-radius: 8px;
+}
+
+#about-section h2 {
+  margin-bottom: 8px;
+}
+
+#about-section h3 {
+  margin-top: 16px;
+  margin-bottom: 6px;
+}
+
+#about-section ul {
+  padding-left: 20px;
+  margin: 0 0 8px 0;
+}
+
+#about-section li {
+  margin-bottom: 4px;
 }
