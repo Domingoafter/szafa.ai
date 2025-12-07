@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       analyzeStyleResult.textContent = "Analizuję inspiracje...";
 
-      fetch("/api/analyze-style-images", {
+      fetch("https://szafa-ai-backend.onrender.com/api/analyze-style-images", {
         method: "POST",
         body: formData,
       })
@@ -398,7 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
           const response = await fetch(
-            "/api/analyze-image",
+            "https://szafa-ai-backend.onrender.com/api/analyze-image",
             {
               method: "POST",
               body: formData,
@@ -454,7 +454,7 @@ document.addEventListener("DOMContentLoaded", () => {
       aiOutput.innerHTML = `<p>Generuję stylizację...</p>`;
       aiImageArea.innerHTML = "";
 
-      fetch("/api/generate-outfit", {
+      fetch("https://szafa-ai-backend.onrender.com/api/generate-outfit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -510,7 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       wardrobeGapsOutput.innerHTML = `<p>Analizuję braki w szafie...</p>`;
 
-      fetch("/api/wardrobe-gaps", {
+      fetch("https://szafa-ai-backend.onrender.com/api/wardrobe-gaps", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -570,7 +570,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     shopResults.innerHTML = `<p>Szukam propozycji w Reserved...</p>`;
 
-    fetch("/api/shop-suggestions", {
+    fetch("https://szafa-ai-backend.onrender.com/api/shop-suggestions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
