@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Szafa AI - Prosta aplikacja garderoby</title>
+    <!-- Podłączamy plik CSS ze stylami -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Szafa AI</h1>
+      <p>
+        Prosty pomocnik garderoby do zapisywania ubrań, preferencji stylu
+        i generowania stylizacji z AI.
+      </p>
+    </header>
+
+    <main>
+           <!-- 🔹 NAWIGACJA MIĘDZY EKRANAMI -->
+      <nav id="main-nav">
+        <button class="nav-button active" data-screen="wardrobe">Garderoba</button>
+        <button class="nav-button" data-screen="inspirations">Inspiracje</button>
+        <button class="nav-button" data-screen="styling">Stylizacje</button>
+      </nav>
+
+      <!-- Sekcja z ubraniami w szafie (tekstowo) -->
+      <section id="wardrobe-section">
+        <h2>Twoja garderoba (lista)</h2>
+        <form id="clothes-form">
+          <div class="form-row">
+            <label for="clothing-name">Nazwa:</label>
+            <input
+              type="text"
+              id="clothing-name"
+              required
+              placeholder="np. biała koszula"
+            />
+          </div>
+
+          <div class="form-row">
+            <label for="clothing-color">Kolor:</label>
+            <input
+              type="text"
+              id="clothing-color"
+              placeholder="np. biały"
+            />
+          </div>
+
+          <div class="form-row">
+            <label for="clothing-type">Rodzaj:</label>
+            <input
+              type="text"
+              id="clothing-type"
+              placeholder="np. koszula, spodnie"
+            />
+          </div>
+
+          <div class="form-row">
+            <label for="clothing-season">Sezon:</label>
+            <input
+              type="text"
+              id="clothing-season"
+              placeholder="np. lato, zima"
+            />
+          </div>
+
+          <button type="submit">Dodaj element garderoby</button>
+        </form>
+
+        <ul id="wardrobe-list">
+          <!-- Nowe ubrania będą tu dodawane w JS -->
+        </ul>
+      </section>
+
+      <!-- NOWA sekcja: zdjęcia ubrań z szafy -->
+      <section id="wardrobe-images-section">
+        <h2>Zdjęcia ubrań z szafy</h2>
+        <p class="small-explainer">
+          Wgraj zdjęcia swoich ubrań. Na razie zapisują się tylko w przeglądarce
+          i pokazują jako podgląd. Później nauczymy AI je analizować.
+        </p>
+        <div class="form-row">
+          <label for="wardrobe-images-input">Dodaj zdjęcia ubrań:</label>
+          <input
+            type="file"
+            id="wardrobe-images-input"
+            accept="image/*"
+            multiple
+          />
+        </div>
+        <div id="wardrobe-images-preview" class="image-grid">
+          <!-- Miniaturki zdjęć ubrań -->
+        </div>
+          <button id="analyze-wardrobe-image-button">
+    Opisz wszystkie zdjęcia z garderoby
+  </button>
+  <p id="analyze-wardrobe-image-result" class="small-explainer"></p>
+</section>
+
+      <!-- Sekcja z preferencjami stylu (tekstowo) -->
+      <section id="preferences-section">
+        <h2>Twoje preferencje stylu</h2>
+        <form id="preferences-form">
+          <div class="form-row">
+            <label for="preference-input">Preferencja:</label>
+            <input
+              type="text"
+              id="preference-input"
+              required
+              placeholder="np. minimalistyczny, elegancki, casual"
+            />
+          </div>
+
+          <button type="submit">Dodaj preferencję</button>
+        </form>
+
+        <ul id="preferences-list">
+          <!-- Nowe preferencje będą tu dodawane w JS -->
+        </ul>
+      </section>
+
+      <!-- NOWA sekcja: zdjęcia inspiracji stylu -->
+      <section id="style-inspo-section">
+        <h2>Inspiracje stylu (obrazki)</h2>
+        <p class="small-explainer">
+          Wgraj zdjęcia inspiracji (np. z Pinteresta, lookbooków). Później AI
+          będzie mogło brać je pod uwagę przy stylizacjach.
+        </p>
+        <div class="form-row">
+          <label for="style-images-input">Dodaj zdjęcia inspiracji:</label>
+          <input
+            type="file"
+            id="style-images-input"
+            accept="image/*"
+            multiple
+          />
+        </div>
+        
+        <div id="style-images-preview" class="image-grid">
+          <!-- Miniaturki zdjęć inspiracji -->
+        </div>
+
+                <button id="analyze-style-images-button">
+          Przeanalizuj inspiracje (demo)
+        </button>
+
+        <button id="clear-style-images-button" class="secondary-button">
+          Wyczyść inspiracje
+        </button>
+
+        <h3>Aktualny profil stylu</h3>
+        <p id="analyze-style-images-result" class="small-explainer">
+          Brak analizy – wgraj inspiracje i kliknij „Przeanalizuj inspiracje”.
+        </p>
+      </section>
+
+
+
+      <!-- Sekcja z AI: generowanie stylizacji -->
+      <section id="ai-section">
+        <h2>Generuj stylizacje z AI</h2>
+        <button id="generate-outfits-button">Generuj stylizację z AI</button>
+        <button id="check-gaps-button" class="secondary-button">
+  Sprawdź braki w szafie
+</button>
+
+<div id="wardrobe-gaps-output">
+  <p class="placeholder-text">
+    Kliknij „Sprawdź braki w szafie”, aby zobaczyć analizę brakujących elementów garderoby.
+  </p>
+</div>
+
+  <!-- 🔹 NOWY PANEL POGODY -->
+  <div id="weather-panel" style="margin-top: 15px;">
+    <h3>Pogoda na dziś</h3>
+
+    <div class="form-row">
+      <label for="weather-temp">Temperatura (°C):</label>
+      <input
+        type="number"
+        id="weather-temp"
+        placeholder="np. 5"
+      />
+    </div>
+
+    <div class="form-row">
+      <label for="weather-condition">Warunki:</label>
+      <select id="weather-condition">
+        <option value="">Wybierz...</option>
+        <option value="słonecznie">Słonecznie</option>
+        <option value="pochmurnie">Pochmurnie</option>
+        <option value="deszcz">Deszcz</option>
+        <option value="śnieg">Śnieg</option>
+        <option value="wiatr">Silny wiatr</option>
+        <option value="upał">Upał</option>
+      </select>
+    </div>
+
+    <p class="small-explainer">
+      Na razie ustawiasz pogodę ręcznie. W kolejnych krokach połączymy aplikację z prawdziwą prognozą.
+    </p>
+  </div>
+  <!-- 🔹 KONIEC PANELU POGODY -->
+        <div id="ai-output">
+          <p class="placeholder-text">
+            Kliknij „Generuj stylizację z AI”, aby zobaczyć wygenerowaną
+            propozycję.
+          </p>
+        </div>
+
+        <div id="ai-image-area">
+          <p class="placeholder-text">
+            W kolejnych krokach podłączymy tutaj wizualne stylizacje generowane
+            przez AI.
+          </p>
+        </div>
+      </section>
+
+      <section id="shop-section">
+  <h2>Propozycje zakupów z Reserved</h2>
+  <p class="small-explainer">
+    Na razie działamy na jednym sklepie – Reserved. Wpisz, czego brakuje
+    w Twojej szafie kapsułowej (np. "biała koszulka basic, proste jeansy
+    niebieskie") oraz budżet na 1 rzecz.
+  </p>
+
+  <div class="form-row">
+    <label for="gaps-input">Braki w szafie:</label>
+    <textarea
+      id="gaps-input"
+      rows="3"
+      placeholder="np. biała koszulka basic, proste jeansy niebieskie, czarne botki na słupku"
+    ></textarea>
+  </div>
+
+  <div class="form-row">
+    <label for="budget-input">Budżet na 1 rzecz (PLN):</label>
+    <input
+      type="number"
+      id="budget-input"
+      placeholder="np. 150"
+    />
+  </div>
+
+  <button id="shop-suggestions-button">
+    Pokaż propozycje w Reserved
+  </button>
+
+  <div id="shop-suggestions-results" class="shop-results">
+    <!-- Tutaj pojawią się kafelki z propozycjami -->
+  </div>
+</section>
+
+    </main>
+
+    <footer>
+      <p>&copy; 2025 Szafa AI (demo)</p>
+    </footer>
+
+    <!-- Podłączamy nasz plik z logiką JS -->
+    <script src="script.js"></script>
+  </body>
+</html>
