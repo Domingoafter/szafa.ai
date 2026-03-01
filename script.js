@@ -671,7 +671,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("authToken");
   alert("Token jest? " + (token ? "TAK" : "NIE"));
 
-  const res = await fetch("http://localhost:3001/api/me", {
+  const res = await fetch("/api/me", {
     method: "GET",
     headers: {
       "Authorization": "Bearer " + token
@@ -684,7 +684,7 @@ document.addEventListener("DOMContentLoaded", () => {
 window.loadGarments = async function () {
   const token = localStorage.getItem("authToken");
 
-  const res = await fetch("http://localhost:3001/api/garments", {
+  const res = await fetch("/api/garments", {
     headers: {
       "Authorization": "Bearer " + token
     }
