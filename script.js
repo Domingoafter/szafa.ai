@@ -10,6 +10,38 @@
     - backend woła AI i zwraca opis + obraz stylizacji,
     - dodatkowo: analiza braków w szafie.
 */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAifWtEi0gXqGlAZ72WtDPzh26_pW7xDxE",
+  authDomain: "check-list-df7cf.firebaseapp.com",
+  projectId: "check-list-df7cf",
+  storageBucket: "check-list-df7cf.firebasestorage.app",
+  messagingSenderId: "616867588591",
+  appId: "1:616867588591:web:2c514803d3393393516e1a",
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+window.loginGoogle = async () => {
+  console.log("Kliknięto loginGoogle");
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const token = await result.user.getIdToken();
+    localStorage.setItem("authToken", token);
+    alert("Zalogowano: " + result.user.email);
+    const items = await window.loadGarments();
+window.renderGarments(items);
+  } catch (e) {
+    console.error("Błąd logowania:", e);
+    alert("Błąd logowania - zobacz Console");
+    alert("TOKEN zapisany? " + (localStorage.getItem("authToken") ? "TAK" : "NIE"));
+
+  }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   // Formularz i lista garderoby
@@ -635,4 +667,54 @@ document.addEventListener("DOMContentLoaded", () => {
   if (navButtons.length > 0) {
     showScreen("wardrobe");
   }
+  window.checkMe = async () => {
+  const token = localStorage.getItem("authToken");
+  alert("Token jest? " + (token ? "TAK" : "NIE"));
+
+  const res = await fetch("http://localhost:3001/api/me", {
+    method: "GET",
+    headers: {
+      "Authorization": "Bearer " + token
+    }
+  });
+
+  const text = await res.text();
+  alert(text);
+};
+window.loadGarments = async function () {
+  const token = localStorage.getItem("authToken");
+
+  const res = await fetch("http://localhost:3001/api/garments", {
+    headers: {
+      "Authorization": "Bearer " + token
+    }
+  });
+
+  const data = await res.json();
+  console.log("GARMENTS:", data);
+
+  return data;
+}
+window.renderGarments = function (items) {
+  const list = document.getElementById("wardrobe-list");
+  if (!list) return;
+
+  list.innerHTML = ""; // czyścimy listę
+
+  items.forEach((g) => {
+    const li = document.createElement("li");
+    li.textContent = `${g.name}${g.color ? " • " + g.color : ""}${g.category ? " • " + g.category : ""}${g.season ? " • " + g.season : ""}`;
+    list.appendChild(li);
+  });
+};
+window.logout = function () {
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("userEmail");
+  alert("Wylogowano. Odśwież stronę.");
+};
+window.refreshWardrobe = async function () {
+  const items = await window.loadGarments();
+  window.renderGarments(items);
+};
+
 });

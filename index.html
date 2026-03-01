@@ -13,6 +13,13 @@
         Prosty pomocnik garderoby do zapisywania ubrań, preferencji stylu
         i generowania stylizacji z AI.
       </p>
+      <button onclick="loginGoogle()">Zaloguj przez Google</button>
+      <button onclick="logout()">Wyloguj</button>
+      <button onclick="checkMe()">Sprawdź kto jestem</button>
+      <button onclick="refreshWardrobe()">Odśwież garderobę z bazy</button>
+
+
+
           <div class="beta-banner">
       <strong>Szafa AI – wersja demo (MVP)</strong>
       <span>
@@ -259,7 +266,7 @@
     <!-- Tutaj pojawią się kafelki z propozycjami -->
   </div>
 </section>
-      <!-- Sekcja: o aplikacji i roadmapa -->
+      <!-- Sekcja: o aplikacji i roadmapa --> 
       <section id="about-section">
         <h2>O tej wersji Szafy AI</h2>
         <p>
@@ -298,7 +305,7 @@
     </footer>
 
     <!-- Podłączamy nasz plik z logiką JS -->
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
   </body>
 </html>
 <!-- test deploy -->
