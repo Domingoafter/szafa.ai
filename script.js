@@ -662,11 +662,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // -----------------------------
   // START
   // -----------------------------
+const token = localStorage.getItem("authToken");
+
+// Jeśli zalogowana -> ładuj z bazy (Supabase przez backend)
+if (token) {
+  window.refreshWardrobe();
+} else {
   loadWardrobeFromStorage();
-  // domyślnie pokaż ekran garderoby (jeśli nawigacja jest)
-  if (navButtons.length > 0) {
-    showScreen("wardrobe");
-  }
+}
   window.checkMe = async () => {
   const token = localStorage.getItem("authToken");
   alert("Token jest? " + (token ? "TAK" : "NIE"));
@@ -682,13 +685,11 @@ document.addEventListener("DOMContentLoaded", () => {
   alert(text);
 };
 window.loadGarments = async function () {
-  const token = localStorage.getItem("authToken");
-
-  const res = await fetch("/api/garments", {
-    headers: {
-      "Authorization": "Bearer " + token
-    }
-  });
+const token = localStorage.getItem("authToken");
+if (!token) return [];
+const res = await fetch("/api/garments", {
+  headers: { Authorization: "Bearer " + token }
+});
 
   const data = await res.json();
   console.log("GARMENTS:", data);
