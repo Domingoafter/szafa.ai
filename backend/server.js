@@ -365,6 +365,14 @@ app.post("/api/garments", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Brak nazwy" });
     }
 
+    // upewnij się, że user istnieje w tabeli users
+    await pool.query(
+      `insert into users (id, email)
+       values ($1, $2)
+       on conflict (id) do update set email = excluded.email`,
+      [req.user.uid, req.user.email || null]
+    );
+
     const result = await pool.query(
       `insert into garments (user_id, name, category, color, season)
        values ($1, $2, $3, $4, $5)
