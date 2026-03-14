@@ -299,6 +299,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const filesArray = Array.from(files);
       let successCount = 0;
+      let failCount = 0;
+      const errors = [];
 
       analyzeImageResult.textContent = `Analizuję ${filesArray.length} zdjęć...`;
 
@@ -312,9 +314,19 @@ document.addEventListener("DOMContentLoaded", () => {
             body: formData,
           });
 
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Błąd analizy zdjęcia: ${response.status} ${errText}`);
+          }
+
           const data = await response.json();
+          console.log("ANALYZE IMAGE RESPONSE:", data);
 
           const description = data.description || "Brak opisu z serwera.";
+
+          if (!description || description === "Brak opisu z serwera.") {
+            throw new Error("Backend nie zwrócił opisu ubrania.");
+          }
 
           const saveRes = await fetch(`${API_BASE}/api/garments`, {
             method: "POST",
@@ -328,18 +340,33 @@ document.addEventListener("DOMContentLoaded", () => {
           });
 
           if (!saveRes.ok) {
-            throw new Error("Nie udało się zapisać ubrania do bazy.");
+            const saveErrText = await saveRes.text();
+            throw new Error(
+              `Błąd zapisu do garderoby: ${saveRes.status} ${saveErrText}`
+            );
           }
+
+          const savedItem = await saveRes.json();
+          console.log("GARMENT SAVED:", savedItem);
 
           successCount++;
           analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
         } catch (error) {
+          failCount++;
+          errors.push(error.message);
           console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
         }
       }
 
       await window.refreshWardrobe();
-      analyzeImageResult.textContent = `Gotowe! Zanalizowano ${successCount} z ${filesArray.length} zdjęć i zapisano do garderoby.`;
+
+      if (successCount > 0 && failCount === 0) {
+        analyzeImageResult.textContent = `Gotowe! Zanalizowano i zapisano ${successCount} z ${filesArray.length} zdjęć.`;
+      } else if (successCount > 0 && failCount > 0) {
+        analyzeImageResult.textContent = `Częściowy sukces: zapisano ${successCount} z ${filesArray.length} zdjęć. Błędy: ${errors.join(" | ")}`;
+      } else {
+        analyzeImageResult.textContent = `Nie udało się zapisać żadnego zdjęcia. Błędy: ${errors.join(" | ")}`;
+      }
     });
   }
 
