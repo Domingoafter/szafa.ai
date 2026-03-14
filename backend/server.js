@@ -358,35 +358,45 @@ app.get("/api/me", requireAuth, (req, res) => {
 const PORT = process.env.PORT || 3001;
 
 app.post("/api/garments", requireAuth, async (req, res) => {
-  const { name, category, color, season } = req.body;
+  try {
+    const { name, category, color, season } = req.body;
 
-  if (!name) {
-    return res.status(400).json({ error: "Brak nazwy" });
+    if (!name) {
+      return res.status(400).json({ error: "Brak nazwy" });
+    }
+
+    const result = await pool.query(
+      `insert into garments (user_id, name, category, color, season)
+       values ($1, $2, $3, $4, $5)
+       returning *`,
+      [req.user.uid, name, category || null, color || null, season || null]
+    );
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Błąd POST /api/garments:", error);
+    return res.status(500).json({
+      error: "Nie udało się zapisać ubrania",
+      details: error.message,
+    });
   }
-
-  await pool.query(
-    `insert into users (id, email)
-     values ($1, $2)
-     on conflict (id) do update set email = excluded.email`,
-    [req.user.uid, req.user.email || null]
-  );
-
-  const result = await pool.query(
-    `insert into garments (user_id, name, category, color, season)
-     values ($1,$2,$3,$4,$5)
-     returning *`,
-    [req.user.uid, name, category || null, color || null, season || null]
-  );
-
-  res.json(result.rows[0]);
 });
 
 app.get("/api/garments", requireAuth, async (req, res) => {
-  const result = await pool.query(
-    `select * from garments where user_id=$1 order by created_at desc`,
-    [req.user.uid]
-  );
-  res.json(result.rows);
+  try {
+    const result = await pool.query(
+      `select * from garments where user_id = $1 order by created_at desc`,
+      [req.user.uid]
+    );
+
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Błąd GET /api/garments:", error);
+    return res.status(500).json({
+      error: "Nie udało się pobrać garderoby",
+      details: error.message,
+    });
+  }
 });
 
 app.listen(PORT, () => {

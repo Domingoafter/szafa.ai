@@ -13,6 +13,7 @@ module.exports = async function requireAuth(req, res, next) {
     req.user = decoded;
     next();
   } catch (e) {
+    console.error("Błąd verifyIdToken:", e);
     return res.status(401).json({ error: "Zły token" });
   }
 };
