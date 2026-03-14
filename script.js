@@ -2,16 +2,23 @@
   Ten plik dodaje interaktywność do naszej strony.
 
   Co robimy:
-    - zapisujemy ubrania dodane w formularzu (lista tekstowa),
     - zapisujemy preferencje stylu,
     - obsługujemy wgrywanie zdjęć (ubrania + inspiracje) i pokazujemy miniaturki,
-    - zapisujemy garderobę oraz inspiracje w localStorage,
-    - po kliknięciu przycisku wysyłamy dane do backendu (garderoba + preferencje + styl + pogoda),
-    - backend woła AI i zwraca opis + obraz stylizacji,
+    - zapisujemy inspiracje w localStorage,
+    - po kliknięciu przycisku wysyłamy dane do backendu,
+    - backend woła AI i zwraca opis stylizacji,
     - dodatkowo: analiza braków w szafie.
 */
+
+const API_BASE = "https://szafa-ai-backend.onrender.com";
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAifWtEi0gXqGlAZ72WtDPzh26_pW7xDxE",
@@ -27,53 +34,49 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 window.loginGoogle = async () => {
-  console.log("Kliknięto loginGoogle");
   try {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userEmail");
+
     const result = await signInWithPopup(auth, provider);
-    const token = await result.user.getIdToken();
+    const token = await result.user.getIdToken(true);
+
     localStorage.setItem("authToken", token);
+    localStorage.setItem("userEmail", result.user.email || "");
+
     alert("Zalogowano: " + result.user.email);
+
     const items = await window.loadGarments();
-window.renderGarments(items);
+    window.renderGarments(items);
   } catch (e) {
     console.error("Błąd logowania:", e);
     alert("Błąd logowania - zobacz Console");
-    alert("TOKEN zapisany? " + (localStorage.getItem("authToken") ? "TAK" : "NIE"));
-
   }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Formularz i lista garderoby
-  const clothesForm = document.getElementById("clothes-form");
   const wardrobeList = document.getElementById("wardrobe-list");
 
-  // Formularz i lista preferencji
   const preferencesForm = document.getElementById("preferences-form");
   const preferencesList = document.getElementById("preferences-list");
 
-  // Przycisk AI i obszary na wynik
   const generateButton = document.getElementById("generate-outfits-button");
   const aiOutput = document.getElementById("ai-output");
   const aiImageArea = document.getElementById("ai-image-area");
 
-    // Zakupy / Reserved
   const gapsInput = document.getElementById("gaps-input");
   const budgetInput = document.getElementById("budget-input");
   const shopButton = document.getElementById("shop-suggestions-button");
   const shopResults = document.getElementById("shop-suggestions-results");
 
-  // Pogoda
   const weatherTempInput = document.getElementById("weather-temp");
   const weatherConditionSelect = document.getElementById("weather-condition");
 
-  // Zdjęcia garderoby
   const wardrobeImagesInput = document.getElementById("wardrobe-images-input");
   const wardrobeImagesPreview = document.getElementById(
     "wardrobe-images-preview"
   );
 
-  // Inspiracje
   const styleImagesInput = document.getElementById("style-images-input");
   const styleImagesPreview = document.getElementById("style-images-preview");
   const analyzeImageButton = document.getElementById(
@@ -92,11 +95,9 @@ document.addEventListener("DOMContentLoaded", () => {
     "clear-style-images-button"
   );
 
-  // 🔹 Przyciski / sekcja „Braki w szafie”
   const checkGapsButton = document.getElementById("check-gaps-button");
   const wardrobeGapsOutput = document.getElementById("wardrobe-gaps-output");
 
-  // 🔹 Nawigacja między „ekranami”
   const navButtons = document.querySelectorAll(".nav-button");
 
   const screenConfig = {
@@ -128,7 +129,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Podpinamy nawigację tylko jeśli przyciski istnieją
   if (navButtons.length > 0) {
     navButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -138,123 +138,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // -----------------------------
-  // GARDEROBA – STAN I LOCALSTORAGE
-  // -----------------------------
+  const STYLE_PROFILE_KEY = "szafaAI_styleProfile";
+  const STYLE_IMAGES_KEY = "szafaAI_styleImages";
 
   let wardrobeState = [];
+  let currentStyleProfile = "";
+  let styleImagesDataUrls = [];
 
-  function saveWardrobeToStorage() {
-    try {
-      localStorage.setItem("szafaAI_wardrobe", JSON.stringify(wardrobeState));
-    } catch (e) {
-      console.error("Nie udało się zapisać garderoby w localStorage:", e);
-    }
-  }
-
-  function renderWardrobeList() {
-    wardrobeList.innerHTML = "";
-
-    wardrobeState.forEach((itemText, index) => {
-      const li = document.createElement("li");
-
-      const span = document.createElement("span");
-      span.textContent = itemText;
-
-      const deleteBtn = document.createElement("button");
-      deleteBtn.textContent = "Usuń";
-      deleteBtn.className = "delete-garment-button";
-      deleteBtn.addEventListener("click", () => {
-        // Ubranie usuwamy TYLKO po kliknięciu „Usuń”
-        wardrobeState.splice(index, 1);
-        saveWardrobeToStorage();
-        renderWardrobeList();
-      });
-
-      li.appendChild(span);
-      li.appendChild(deleteBtn);
-      wardrobeList.appendChild(li);
-    });
-  }
-
-  function loadWardrobeFromStorage() {
-    try {
-      const raw = localStorage.getItem("szafaAI_wardrobe");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        wardrobeState = parsed;
-        renderWardrobeList();
-      }
-    } catch (e) {
-      console.error("Nie udało się odczytać garderoby z localStorage:", e);
-    }
-  }
-
-  function addGarmentToWardrobe(itemText) {
-    wardrobeState.push(itemText);
-    saveWardrobeToStorage();
-    renderWardrobeList();
-  }
-
-  // -----------------------------
-  // FORMULARZ GARDEROBY (TEKST)
-  // -----------------------------
-  if (clothesForm) {
-    clothesForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-
-      const nameInput = document.getElementById("clothing-name");
-      const colorInput = document.getElementById("clothing-color");
-      const typeInput = document.getElementById("clothing-type");
-      const seasonInput = document.getElementById("clothing-season");
-
-      const name = nameInput.value.trim();
-      const color = colorInput.value.trim();
-      const type = typeInput.value.trim();
-      const season = seasonInput.value.trim();
-
-      if (!name) {
-        return;
-      }
-
-      const descriptionParts = [name];
-      if (color) descriptionParts.push(`Kolor: ${color}`);
-      if (type) descriptionParts.push(`Rodzaj: ${type}`);
-      if (season) descriptionParts.push(`Sezon: ${season}`);
-
-      const itemText = descriptionParts.join(" | ");
-
-      addGarmentToWardrobe(itemText);
-      clothesForm.reset();
-    });
-  }
-
-  // -----------------------------
-  // PREFERENCJE STYLU (NA RAZIE BEZ LOCALSTORAGE)
-  // -----------------------------
-  if (preferencesForm) {
-    preferencesForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-
-      const preferenceInput = document.getElementById("preference-input");
-      const preference = preferenceInput.value.trim();
-
-      if (!preference) {
-        return;
-      }
-
-      const li = document.createElement("li");
-      li.textContent = preference;
-      preferencesList.appendChild(li);
-
-      preferenceInput.value = "";
-    });
-  }
-
-  // -----------------------------
-  // PODGLĄD ZDJĘĆ UBRAN
-  // -----------------------------
   function previewImages(files, container) {
     container.innerHTML = "";
 
@@ -272,25 +162,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (wardrobeImagesInput) {
-    wardrobeImagesInput.addEventListener("change", (event) => {
-      const files = event.target.files;
-      previewImages(files, wardrobeImagesPreview);
-    });
-  }
-
-  // -----------------------------
-  // INSPIRACJE – STYL + OBRAZKI (LOCALSTORAGE)
-  // -----------------------------
-
-  const STYLE_PROFILE_KEY = "szafaAI_styleProfile";
-  const STYLE_IMAGES_KEY = "szafaAI_styleImages";
-
-  let currentStyleProfile = "";
-  let styleImagesDataUrls = [];
-
   function renderStyleImagesFromData() {
     styleImagesPreview.innerHTML = "";
+
     styleImagesDataUrls.forEach((url) => {
       const img = document.createElement("img");
       img.src = url;
@@ -299,8 +173,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (wardrobeImagesInput) {
+    wardrobeImagesInput.addEventListener("change", (event) => {
+      const files = event.target.files;
+      previewImages(files, wardrobeImagesPreview);
+    });
+  }
+
   if (styleImagesPreview && analyzeStyleResult) {
-    // Przy starcie – wczytaj profil stylu
     const savedStyleProfile = localStorage.getItem(STYLE_PROFILE_KEY);
     if (savedStyleProfile) {
       currentStyleProfile = savedStyleProfile;
@@ -310,7 +190,6 @@ document.addEventListener("DOMContentLoaded", () => {
         'Brak analizy – wgraj inspiracje i kliknij „Przeanalizuj inspiracje”.';
     }
 
-    // Przy starcie – wczytaj inspiracje (miniaturki)
     const savedStyleImagesJson = localStorage.getItem(STYLE_IMAGES_KEY);
     if (savedStyleImagesJson) {
       try {
@@ -324,7 +203,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (styleImagesInput) {
-    // Input zdjęć inspiracji – zapis do localStorage
     styleImagesInput.addEventListener("change", (event) => {
       const files = event.target.files;
 
@@ -355,7 +233,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (analyzeStyleButton) {
-    // Analiza inspiracji – zapis profilu stylu
     analyzeStyleButton.addEventListener("click", () => {
       const files = styleImagesInput.files;
 
@@ -372,14 +249,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       analyzeStyleResult.textContent = "Analizuję inspiracje...";
 
-      fetch("https://szafa-ai-backend.onrender.com/api/analyze-style-images", {
+      fetch(`${API_BASE}/api/analyze-style-images`, {
         method: "POST",
         body: formData,
       })
         .then((response) => response.json())
         .then((data) => {
-          const styleText =
-            data.styleProfile || "Brak opisu stylu z serwera.";
+          const styleText = data.styleProfile || "Brak opisu stylu z serwera.";
           analyzeStyleResult.textContent = styleText;
           currentStyleProfile = styleText;
           localStorage.setItem(STYLE_PROFILE_KEY, styleText);
@@ -393,7 +269,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (clearStyleButton) {
-    // Wyczyść inspiracje
     clearStyleButton.addEventListener("click", () => {
       styleImagesInput.value = "";
       styleImagesPreview.innerHTML = "";
@@ -406,9 +281,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // -----------------------------
-  // ANALIZA ZDJĘĆ UBRANIA (VISION) – WIELE NARAZ
-  // -----------------------------
   if (analyzeImageButton) {
     analyzeImageButton.addEventListener("click", async () => {
       const files = wardrobeImagesInput.files;
@@ -416,6 +288,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!files || files.length === 0) {
         analyzeImageResult.textContent =
           "Najpierw wgraj przynajmniej jedno zdjęcie ubrania.";
+        return;
+      }
+
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        analyzeImageResult.textContent = "Najpierw zaloguj się przez Google.";
         return;
       }
 
@@ -429,36 +307,59 @@ document.addEventListener("DOMContentLoaded", () => {
         formData.append("image", file);
 
         try {
-          const response = await fetch(
-            "https://szafa-ai-backend.onrender.com/api/analyze-image",
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
+          const response = await fetch(`${API_BASE}/api/analyze-image`, {
+            method: "POST",
+            body: formData,
+          });
 
           const data = await response.json();
+
           const description = data.description || "Brak opisu z serwera.";
 
-          // dodaj opis jako element garderoby
-          addGarmentToWardrobe(description);
-          successCount++;
+          const saveRes = await fetch(`${API_BASE}/api/garments`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + token,
+            },
+            body: JSON.stringify({
+              name: description,
+            }),
+          });
 
+          if (!saveRes.ok) {
+            throw new Error("Nie udało się zapisać ubrania do bazy.");
+          }
+
+          successCount++;
           analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
         } catch (error) {
-          console.error("Błąd podczas analizy zdjęcia:", error);
-          // nie przerywamy, lecimy dalej z kolejnymi zdjęciami
+          console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
         }
       }
 
-      analyzeImageResult.textContent = `Gotowe! Zanalizowano ${successCount} z ${filesArray.length} zdjęć i dodano do garderoby.`;
+      await window.refreshWardrobe();
+      analyzeImageResult.textContent = `Gotowe! Zanalizowano ${successCount} z ${filesArray.length} zdjęć i zapisano do garderoby.`;
     });
   }
 
+  if (preferencesForm) {
+    preferencesForm.addEventListener("submit", (event) => {
+      event.preventDefault();
 
-  // -----------------------------
-  // GENEROWANIE STYLIZACJI Z AI
-  // -----------------------------
+      const preferenceInput = document.getElementById("preference-input");
+      const preference = preferenceInput.value.trim();
+
+      if (!preference) return;
+
+      const li = document.createElement("li");
+      li.textContent = preference;
+      preferencesList.appendChild(li);
+
+      preferenceInput.value = "";
+    });
+  }
+
   if (generateButton) {
     generateButton.addEventListener("click", () => {
       const wardrobeItems = [...wardrobeState];
@@ -476,26 +377,25 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       if (wardrobeItems.length === 0) {
-        aiOutput.innerHTML = `
-          <p>Dodaj najpierw kilka ubrań do swojej garderoby, żeby wygenerować stylizację.</p>
-        `;
+        aiOutput.innerHTML =
+          "<p>Dodaj najpierw kilka ubrań do swojej garderoby, żeby wygenerować stylizację.</p>";
         aiImageArea.innerHTML = "";
         return;
       }
 
-      aiOutput.innerHTML = `<p>Generuję stylizację...</p>`;
+      aiOutput.innerHTML = "<p>Generuję stylizację...</p>";
       aiImageArea.innerHTML = "";
 
-      fetch("https://szafa-ai-backend.onrender.com/api/generate-outfit", {
+      fetch(`${API_BASE}/api/generate-outfit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           wardrobe: wardrobeItems,
-          preferences: preferences,
+          preferences,
           styleProfile: currentStyleProfile,
-          weather: weather,
+          weather,
         }),
       })
         .then((response) => response.json())
@@ -519,30 +419,25 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .catch((error) => {
           console.error("Błąd podczas wywołania backendu:", error);
-          aiOutput.innerHTML = `
-            <p>Wystąpił błąd podczas generowania stylizacji. Spróbuj ponownie.</p>
-          `;
+          aiOutput.innerHTML =
+            "<p>Wystąpił błąd podczas generowania stylizacji. Spróbuj ponownie.</p>";
         });
     });
   }
 
-  // -----------------------------
-  // „BRAKI W SZAFIE”
-  // -----------------------------
   if (checkGapsButton && wardrobeGapsOutput) {
     checkGapsButton.addEventListener("click", () => {
       const wardrobeItems = [...wardrobeState];
 
       if (wardrobeItems.length === 0) {
-        wardrobeGapsOutput.innerHTML = `
-          <p>Dodaj ubrania, aby zobaczyć analizę braków.</p>
-        `;
+        wardrobeGapsOutput.innerHTML =
+          "<p>Dodaj ubrania, aby zobaczyć analizę braków.</p>";
         return;
       }
 
-      wardrobeGapsOutput.innerHTML = `<p>Analizuję braki w szafie...</p>`;
+      wardrobeGapsOutput.innerHTML = "<p>Analizuję braki w szafie...</p>";
 
-      fetch("https://szafa-ai-backend.onrender.com/api/wardrobe-gaps", {
+      fetch(`${API_BASE}/api/wardrobe-gaps`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -562,160 +457,180 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .catch((error) => {
           console.error("Błąd przy analizie braków:", error);
-          wardrobeGapsOutput.innerHTML = `
-            <p>Nie udało się przeanalizować braków. Spróbuj ponownie.</p>
+          wardrobeGapsOutput.innerHTML =
+            "<p>Nie udało się przeanalizować braków. Spróbuj ponownie.</p>";
+        });
+    });
+  }
+
+  if (shopButton) {
+    shopButton.addEventListener("click", () => {
+      const gapsText = gapsInput.value.trim();
+
+      if (!gapsText) {
+        shopResults.innerHTML = `
+          <p class="small-explainer">
+            Najpierw wpisz, jakich elementów brakuje w Twojej szafie (np. "biała koszulka basic, czarne botki").
+          </p>
+        `;
+        return;
+      }
+
+      const gaps = gapsText
+        .split(",")
+        .map((g) => g.trim())
+        .filter((g) => g.length > 0);
+
+      if (gaps.length === 0) {
+        shopResults.innerHTML = `
+          <p class="small-explainer">
+            Nie udało się odczytać braków z wpisanego tekstu. Spróbuj wpisać je po przecinku.
+          </p>
+        `;
+        return;
+      }
+
+      const budget =
+        budgetInput.value && budgetInput.value.trim() !== ""
+          ? Number(budgetInput.value)
+          : null;
+
+      shopResults.innerHTML = "<p>Szukam propozycji w Reserved...</p>";
+
+      fetch(`${API_BASE}/api/shop-suggestions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gaps,
+          budgetPerItem: budget,
+          currency: "PLN",
+          country: "PL",
+          preferredStore: "Reserved",
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (!data.suggestions || data.suggestions.length === 0) {
+            shopResults.innerHTML = `
+              <p class="small-explainer">
+                Na razie brak propozycji. Spróbuj wpisać inne braki.
+              </p>
+            `;
+            return;
+          }
+
+          shopResults.innerHTML = data.suggestions
+            .map((sugg) => {
+              return `
+                <div class="shop-card">
+                  <h4>${sugg.gap}</h4>
+                  <p>Sklep: <strong>${sugg.store}</strong></p>
+                  ${
+                    sugg.approxPrice
+                      ? `<p>Budżet na 1 sztukę: ok. ${sugg.approxPrice} ${sugg.currency}</p>`
+                      : ""
+                  }
+                  <p>
+                    <a href="${sugg.searchUrl}" target="_blank" rel="noopener noreferrer">
+                      Otwórz wyszukiwanie w Reserved
+                    </a>
+                  </p>
+                  <p class="small-explainer">${sugg.note}</p>
+                </div>
+              `;
+            })
+            .join("");
+        })
+        .catch((error) => {
+          console.error("Błąd podczas pobierania propozycji z Reserved:", error);
+          shopResults.innerHTML = `
+            <p class="small-explainer">
+              Wystąpił błąd podczas pobierania propozycji. Spróbuj ponownie za chwilę.
+            </p>
           `;
         });
     });
   }
-  // 🔹 Obsługa przycisku "Pokaż propozycje w Reserved"
-  shopButton.addEventListener("click", () => {
-    const gapsText = gapsInput.value.trim();
 
-    if (!gapsText) {
-      shopResults.innerHTML = `
-        <p class="small-explainer">
-          Najpierw wpisz, jakich elementów brakuje w Twojej szafie (np. "biała koszulka basic, czarne botki").
-        </p>
-      `;
-      return;
-    }
-
-    const gaps = gapsText
-      .split(",")
-      .map((g) => g.trim())
-      .filter((g) => g.length > 0);
-
-    if (gaps.length === 0) {
-      shopResults.innerHTML = `
-        <p class="small-explainer">
-          Nie udało się odczytać braków z wpisanego tekstu. Spróbuj wpisać je po przecinku.
-        </p>
-      `;
-      return;
-    }
-
-    const budget =
-      budgetInput.value && budgetInput.value.trim() !== ""
-        ? Number(budgetInput.value)
-        : null;
-
-    shopResults.innerHTML = `<p>Szukam propozycji w Reserved...</p>`;
-
-    fetch("https://szafa-ai-backend.onrender.com/api/shop-suggestions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        gaps,
-        budgetPerItem: budget,
-        currency: "PLN",
-        country: "PL",
-        preferredStore: "Reserved",
-      }),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data.suggestions || data.suggestions.length === 0) {
-          shopResults.innerHTML = `
-            <p class="small-explainer">
-              Na razie brak propozycji. Spróbuj wpisać inne braki.
-            </p>
-          `;
-          return;
-        }
-
-        // Budujemy kafelki z propozycjami
-        shopResults.innerHTML = data.suggestions
-          .map((sugg) => {
-            return `
-              <div class="shop-card">
-                <h4>${sugg.gap}</h4>
-                <p>Sklep: <strong>${sugg.store}</strong></p>
-                ${
-                  sugg.approxPrice
-                    ? `<p>Budżet na 1 sztukę: ok. ${sugg.approxPrice} ${sugg.currency}</p>`
-                    : ""
-                }
-                <p>
-                  <a href="${sugg.searchUrl}" target="_blank" rel="noopener noreferrer">
-                    Otwórz wyszukiwanie w Reserved
-                  </a>
-                </p>
-                <p class="small-explainer">${sugg.note}</p>
-              </div>
-            `;
-          })
-          .join("");
-      })
-      .catch((error) => {
-        console.error("Błąd podczas pobierania propozycji z Reserved:", error);
-        shopResults.innerHTML = `
-          <p class="small-explainer">
-            Wystąpił błąd podczas pobierania propozycji. Spróbuj ponownie za chwilę.
-          </p>
-        `;
-      });
-  });
-
-  // -----------------------------
-  // START
-  // -----------------------------
-const token = localStorage.getItem("authToken");
-
-// Jeśli zalogowana -> ładuj z bazy (Supabase przez backend)
-if (token) {
-  window.refreshWardrobe();
-} else {
-  loadWardrobeFromStorage();
-}
   window.checkMe = async () => {
-  const token = localStorage.getItem("authToken");
-  alert("Token jest? " + (token ? "TAK" : "NIE"));
+    const token = localStorage.getItem("authToken");
+    alert("Token jest? " + (token ? "TAK" : "NIE"));
 
-  const res = await fetch("/api/me", {
-    method: "GET",
-    headers: {
-      "Authorization": "Bearer " + token
+    const res = await fetch(`${API_BASE}/api/me`, {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + token,
+      },
+    });
+
+    const text = await res.text();
+    alert(text);
+  };
+
+  window.loadGarments = async function () {
+    const token = localStorage.getItem("authToken");
+    if (!token) return [];
+
+    const res = await fetch(`${API_BASE}/api/garments`, {
+      headers: { Authorization: "Bearer " + token },
+    });
+
+    if (!res.ok) {
+      return [];
     }
-  });
 
-  const text = await res.text();
-  alert(text);
-};
-window.loadGarments = async function () {
-const token = localStorage.getItem("authToken");
-if (!token) return [];
-const res = await fetch("/api/garments", {
-  headers: { Authorization: "Bearer " + token }
-});
+    const data = await res.json();
+    console.log("GARMENTS:", data);
 
-  const data = await res.json();
-  console.log("GARMENTS:", data);
+    return data;
+  };
 
-  return data;
-}
-window.renderGarments = function (items) {
-  const list = document.getElementById("wardrobe-list");
-  if (!list) return;
+  window.renderGarments = function (items) {
+    const list = document.getElementById("wardrobe-list");
+    if (!list) return;
 
-  list.innerHTML = ""; // czyścimy listę
+    list.innerHTML = "";
+    wardrobeState = [];
 
-  items.forEach((g) => {
-    const li = document.createElement("li");
-    li.textContent = `${g.name}${g.color ? " • " + g.color : ""}${g.category ? " • " + g.category : ""}${g.season ? " • " + g.season : ""}`;
-    list.appendChild(li);
-  });
-};
-window.logout = function () {
-  localStorage.removeItem("authToken");
-  localStorage.removeItem("userEmail");
-  alert("Wylogowano. Odśwież stronę.");
-};
-window.refreshWardrobe = async function () {
-  const items = await window.loadGarments();
-  window.renderGarments(items);
-};
+    items.forEach((g) => {
+      const label = `${g.name}${g.color ? " • " + g.color : ""}${
+        g.category ? " • " + g.category : ""
+      }${g.season ? " • " + g.season : ""}`;
 
+      wardrobeState.push(label);
+
+      const li = document.createElement("li");
+      li.textContent = label;
+      list.appendChild(li);
+    });
+  };
+
+  window.logout = async function () {
+    try {
+      await signOut(auth);
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userEmail");
+      wardrobeState = [];
+      window.renderGarments([]);
+      alert("Wylogowano.");
+      location.reload();
+    } catch (e) {
+      console.error("Błąd wylogowania:", e);
+      alert("Nie udało się wylogować.");
+    }
+  };
+
+  window.refreshWardrobe = async function () {
+    const items = await window.loadGarments();
+    window.renderGarments(items);
+  };
+
+  const token = localStorage.getItem("authToken");
+  if (token) {
+    window.refreshWardrobe();
+  } else {
+    window.renderGarments([]);
+  }
 });
