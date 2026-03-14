@@ -350,8 +350,23 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "index.html"));
 });
 
-app.get("/api/me", requireAuth, (req, res) => {
-  res.json({ uid: req.user.uid, email: req.user.email });
+app.get("/api/me", requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `insert into users (id, email)
+       values ($1, $2)
+       on conflict (id) do update set email = excluded.email`,
+      [req.user.uid, req.user.email || null]
+    );
+
+    res.json({ uid: req.user.uid, email: req.user.email });
+  } catch (error) {
+    console.error("Błąd GET /api/me:", error);
+    res.status(500).json({
+      error: "Nie udało się zsynchronizować użytkownika",
+      details: error.message,
+    });
+  }
 });
 
 // Uruchamiamy serwer

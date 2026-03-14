@@ -44,6 +44,18 @@ window.loginGoogle = async () => {
     localStorage.setItem("authToken", token);
     localStorage.setItem("userEmail", result.user.email || "");
 
+    const meRes = await fetch(`${API_BASE}/api/me`, {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + token,
+      },
+    });
+
+    if (!meRes.ok) {
+      const txt = await meRes.text();
+      throw new Error(`Nie udało się zsynchronizować użytkownika: ${txt}`);
+    }
+
     alert("Zalogowano: " + result.user.email);
 
     const items = await window.loadGarments();
