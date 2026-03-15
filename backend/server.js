@@ -17,7 +17,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 // Serwujemy pliki frontendu (index.html, style.css, script.js) z katalogu głównego projektu
-app.use(express.static(path.join(__dirname, "..")));
+app.use(express.static(path.join(__dirname, "public")));
 
 // Klient OpenAI – używa klucza z .env
 const openai = new OpenAI({
