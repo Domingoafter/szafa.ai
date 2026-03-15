@@ -11,8 +11,6 @@
 */
 
 const API_BASE = "https://szafa-ai-backend.onrender.com";
-console.log("SCRIPT VERSION DELETE TEST 777");
-alert("SCRIPT VERSION DELETE TEST 777");
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -323,54 +321,59 @@ document.addEventListener("DOMContentLoaded", () => {
         formData.append("image", file);
 
         try {
-          const response = await fetch(`${API_BASE}/api/analyze-image`, {
-            method: "POST",
-            body: formData,
-          });
+  const response = await fetch(`${API_BASE}/api/analyze-garment`, {
+    method: "POST",
+    body: formData,
+  });
 
-          if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Błąd analizy zdjęcia: ${response.status} ${errText}`);
-          }
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Błąd analizy zdjęcia: ${response.status} ${errText}`);
+  }
 
-          const data = await response.json();
-          console.log("ANALYZE IMAGE RESPONSE:", data);
+  const data = await response.json();
+  console.log("ANALYZE GARMENT RESPONSE:", data);
 
-          const description = data.description || "Brak opisu z serwera.";
+  const garmentName = data.name || "Nieznane ubranie";
+  const garmentCategory = data.category || "unknown";
+  const garmentColor = data.color || "unknown";
+  const garmentSeason = data.season || "unknown";
 
-          if (!description || description === "Brak opisu z serwera.") {
-            throw new Error("Backend nie zwrócił opisu ubrania.");
-          }
+  if (!garmentName) {
+    throw new Error("Backend nie zwrócił danych ubrania.");
+  }
 
-          const saveRes = await fetch(`${API_BASE}/api/garments`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + token,
-            },
-            body: JSON.stringify({
-              name: description,
-            }),
-          });
+  const saveRes = await fetch(`${API_BASE}/api/garments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    },
+    body: JSON.stringify({
+      name: garmentName,
+      category: garmentCategory,
+      color: garmentColor,
+      season: garmentSeason,
+    }),
+  });
 
-          if (!saveRes.ok) {
-            const saveErrText = await saveRes.text();
-            throw new Error(
-              `Błąd zapisu do garderoby: ${saveRes.status} ${saveErrText}`
-            );
-          }
+  if (!saveRes.ok) {
+    const saveErrText = await saveRes.text();
+    throw new Error(
+      `Błąd zapisu do garderoby: ${saveRes.status} ${saveErrText}`
+    );
+  }
 
-          const savedItem = await saveRes.json();
-          console.log("GARMENT SAVED:", savedItem);
+  const savedItem = await saveRes.json();
+  console.log("GARMENT SAVED:", savedItem);
 
-          successCount++;
-          analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
-        } catch (error) {
-          failCount++;
-          errors.push(error.message);
-          console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
-        }
-      }
+  successCount++;
+  analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
+} catch (error) {
+  failCount++;
+  errors.push(error.message);
+  console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
+}
 
       await window.refreshWardrobe();
 
@@ -667,9 +670,13 @@ document.addEventListener("DOMContentLoaded", () => {
     wardrobeState = [];
 
     items.forEach((g) => {
-      const label = `${g.name}${g.color ? " • " + g.color : ""}${
-        g.category ? " • " + g.category : ""
-      }${g.season ? " • " + g.season : ""}`;
+      const parts = [g.name];
+
+if (g.color && g.color !== "unknown") parts.push(g.color);
+if (g.category && g.category !== "unknown") parts.push(g.category);
+if (g.season && g.season !== "unknown") parts.push(g.season);
+
+const label = parts.join(" • ");
 
       wardrobeState.push(label);
 

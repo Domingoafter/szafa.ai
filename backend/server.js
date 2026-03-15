@@ -439,15 +439,20 @@ Nie zgaduj, jeśli czegoś nie widać.
 
 Format odpowiedzi:
 {
+  "name": "...",
   "category": "...",
   "color": "...",
-  "description": "..."
+  "season": "..."
 }
 
 Zasady:
-- category = krótka kategoria ubrania po polsku, np. "marynarka", "koszula", "spodnie", "sukienka"
-- color = główny kolor po polsku
-- description = 1 krótkie zdanie po polsku o fasonie / charakterze ubrania
+- name = krótka naturalna nazwa ubrania po polsku, np. "biała koszula oversize", "czarne jeansy", "beżowy płaszcz"
+- category = jedna z wartości:
+  "top", "bottom", "outerwear", "dress", "shoes", "bag", "accessory", "unknown"
+- color = główny kolor po polsku, np. "biały", "czarny", "beżowy", "granatowy"
+- season = jedna z wartości:
+  "spring", "summer", "autumn", "winter", "all-season", "unknown"
+- jeśli czegoś nie da się określić, wpisz "unknown"
 `.trim();
 
     const aiResponse = await openai.responses.create({
@@ -479,10 +484,11 @@ Zasady:
     }
 
     return res.json({
-      category: parsed.category || "nieznane",
-      color: parsed.color || "nieznany",
-      description: parsed.description || "Brak opisu",
-    });
+  name: parsed.name || "Nieznane ubranie",
+  category: parsed.category || "unknown",
+  color: parsed.color || "unknown",
+  season: parsed.season || "unknown",
+});
   } catch (error) {
     console.error("Błąd przy analizie ubrania:", error);
     return res.status(500).json({
