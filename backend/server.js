@@ -421,7 +421,107 @@ app.get("/api/garments", requireAuth, async (req, res) => {
     });
   }
 });
+app.post("/api/analyze-garment", upload.single("image"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Brak zdjęcia ubrania" });
+  }
 
-app.listen(PORT, () => {
+  try {
+    const base64Image = req.file.buffer.toString("base64");
+    const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+
+    const prompt = `
+Przeanalizuj jedno główne ubranie widoczne na zdjęciu.
+
+Zwróć odpowiedź WYŁĄCZNIE w czystym JSON-ie, bez dodatkowego tekstu.
+Nie używaj markdowna.
+Nie zgaduj, jeśli czegoś nie widać.
+
+Format odpowiedzi:
+{
+  "category": "...",
+  "color": "...",
+  "description": "..."
+}
+
+Zasady:
+- category = krótka kategoria ubrania po polsku, np. "marynarka", "koszula", "spodnie", "sukienka"
+- color = główny kolor po polsku
+- description = 1 krótkie zdanie po polsku o fasonie / charakterze ubrania
+`.trim();
+
+    const aiResponse = await openai.responses.create({
+      model: "gpt-4o-mini",
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: prompt },
+            { type: "input_image", image_url: imageUrl },
+          ],
+        },
+      ],
+    });
+
+    const text =
+      aiResponse.output_text || '{"category":"nieznane","color":"nieznany","description":"Nie udało się przeanalizować ubrania."}';
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseError) {
+      console.error("Nie udało się sparsować JSON z AI:", text);
+      return res.status(500).json({
+        error: "AI zwróciło niepoprawny format odpowiedzi",
+        raw: text,
+      });
+    }
+
+    return res.json({
+      category: parsed.category || "nieznane",
+      color: parsed.color || "nieznany",
+      description: parsed.description || "Brak opisu",
+    });
+  } catch (error) {
+    console.error("Błąd przy analizie ubrania:", error);
+    return res.status(500).json({
+      error: "Nie udało się przeanalizować ubrania.",
+    });
+  }
+});
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Backend działa' });
+});
+// DELETE garment
+app.delete("/api/garments/:id", requireAuth, async (req, res) => {
+  try {
+    const garmentId = req.params.id;
+    const userId = req.user.uid;
+
+    const result = await pool.query(
+      `
+      DELETE FROM garments
+      WHERE id = $1 AND user_id = $2
+      RETURNING *
+      `,
+      [garmentId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Garment not found" });
+    }
+
+    res.json({
+      success: true,
+      deleted: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("DELETE GARMENT ERROR:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Serwer działa na porcie ${PORT}`);
 });
