@@ -147,10 +147,15 @@ app.post("/api/generate-outfit", async (req, res) => {
     return res.json({
       description: "Dodaj najpierw ubrania, by wygenerować stylizację.",
       imageUrl: null,
+      selectedItems: [],
     });
   }
 
-  const wardrobeText = wardrobe.join("; ");
+  const wardrobeText = wardrobe
+    .map((item, index) => {
+      return `${index + 1}. ${item.name} | kategoria: ${item.category} | kolor: ${item.color} | sezon: ${item.season}`;
+    })
+    .join("\n");
 
   const preferencesText =
     preferences && preferences.length > 0
@@ -195,7 +200,7 @@ Jesteś wirtualną stylistką w aplikacji "Szafa AI".
 
 Tworzysz stylizację dla: ${genderText}.
 
-Masz używać WYŁĄCZNIE ubrań z tej garderoby:
+Masz do dyspozycji WYŁĄCZNIE te ubrania:
 ${wardrobeText}
 
 Preferencje użytkownika:
@@ -207,29 +212,29 @@ ${styleProfileText}
 Warunki pogodowe:
 ${weatherText}
 
-Zasady:
-1. Nie wymyślaj nowych ubrań.
-2. Używaj tylko elementów z listy garderoby.
-3. Stylizacja ma być praktyczna do pogody.
-4. Jeśli czegoś brakuje, wpisz to tylko w sekcji "Braki".
-5. Odpowiedz krótko i konkretnie po polsku.
+Twoje zadanie:
+1. Wybierz wyłącznie ubrania z listy.
+2. Nie wymyślaj nowych elementów.
+3. Dobierz spójną stylizację.
+4. Jeśli czegoś brakuje, wpisz to tylko w polu "missing".
+5. Odpowiedz WYŁĄCZNIE w czystym JSON-ie.
+6. Nie używaj markdowna.
 
 Format odpowiedzi:
+{
+  "selectedItems": ["...", "..."],
+  "description": "...",
+  "occasion": "...",
+  "missing": "...",
+  "tip": "..."
+}
 
-STYLIZACJA:
-1-2 zdania opisu.
-
-ELEMENTY:
-- lista konkretnych elementów z garderoby
-
-OKAZJA:
-1 zdanie
-
-BRAKI:
-1-2 zdania
-
-TIP:
-1 zdanie
+Zasady:
+- selectedItems = nazwy ubrań dokładnie z przekazanej listy
+- description = 1-2 zdania po polsku
+- occasion = 1 krótkie zdanie
+- missing = krótka informacja, czego ewentualnie brakuje
+- tip = 1 krótka praktyczna wskazówka
 `.trim();
 
   try {
@@ -239,11 +244,29 @@ TIP:
     });
 
     const text =
-      aiResponse.output?.[0]?.content?.[0]?.text ||
-      "Nie udało się odczytać odpowiedzi AI.";
+      aiResponse.output_text ||
+      '{"selectedItems":[],"description":"Nie udało się wygenerować stylizacji.","occasion":"","missing":"","tip":""}';
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseError) {
+      console.error("Nie udało się sparsować JSON stylizacji:", text);
+      return res.status(500).json({
+        description: "AI zwróciło niepoprawny format odpowiedzi.",
+        imageUrl: null,
+        selectedItems: [],
+        raw: text,
+      });
+    }
 
     return res.json({
-      description: text,
+      selectedItems: parsed.selectedItems || [],
+      description: parsed.description || "Brak opisu stylizacji.",
+      occasion: parsed.occasion || "",
+      missing: parsed.missing || "",
+      tip: parsed.tip || "",
       imageUrl: null,
     });
   } catch (error) {
@@ -251,6 +274,7 @@ TIP:
     return res.status(500).json({
       description: "Wystąpił błąd po stronie AI. Spróbuj ponownie za chwilę.",
       imageUrl: null,
+      selectedItems: [],
     });
   }
 });

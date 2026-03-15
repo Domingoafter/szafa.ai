@@ -446,9 +446,17 @@ document.addEventListener("DOMContentLoaded", () => {
         .then((response) => response.json())
         .then((data) => {
           aiOutput.innerHTML = `
-            <h3>Stylizacja na dziś</h3>
-            <p>${data.description}</p>
-          `;
+  <h3>Stylizacja na dziś</h3>
+  <p><strong>Opis:</strong> ${data.description || "-"}</p>
+  <p><strong>Wybrane ubrania:</strong> ${
+    data.selectedItems && data.selectedItems.length > 0
+      ? data.selectedItems.join(", ")
+      : "Brak"
+  }</p>
+  <p><strong>Okazja:</strong> ${data.occasion || "-"}</p>
+  <p><strong>Braki:</strong> ${data.missing || "-"}</p>
+  <p><strong>Tip:</strong> ${data.tip || "-"}</p>
+`;
 
           if (data.imageUrl) {
             aiImageArea.innerHTML = `
