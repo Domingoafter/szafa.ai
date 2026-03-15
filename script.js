@@ -626,6 +626,37 @@ document.addEventListener("DOMContentLoaded", () => {
     return data;
   };
 
+  window.deleteGarment = async function (id) {
+    const token = localStorage.getItem("authToken");
+
+    if (!token) {
+      alert("Najpierw zaloguj się.");
+      return;
+    }
+
+    const confirmed = confirm("Czy na pewno chcesz usunąć to ubranie?");
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/garments/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer " + token,
+        },
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Nie udało się usunąć ubrania.");
+      }
+
+      await window.refreshWardrobe();
+    } catch (error) {
+      console.error("Błąd usuwania ubrania:", error);
+      alert("Nie udało się usunąć ubrania.");
+    }
+  };
+
   window.renderGarments = function (items) {
     const list = document.getElementById("wardrobe-list");
     if (!list) return;
@@ -641,7 +672,20 @@ document.addEventListener("DOMContentLoaded", () => {
       wardrobeState.push(label);
 
       const li = document.createElement("li");
-      li.textContent = label;
+      li.className = "garment-item";
+
+      const textSpan = document.createElement("span");
+      textSpan.textContent = label;
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Usuń";
+      deleteBtn.className = "delete-garment-button";
+      deleteBtn.addEventListener("click", () => {
+        window.deleteGarment(g.id);
+      });
+
+      li.appendChild(textSpan);
+      li.appendChild(deleteBtn);
       list.appendChild(li);
     });
   };
