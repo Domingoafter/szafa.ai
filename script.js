@@ -11,6 +11,8 @@
 */
 
 const API_BASE = "https://szafa-ai-backend.onrender.com";
+console.log("SCRIPT VERSION DELETE TEST 777");
+alert("SCRIPT VERSION DELETE TEST 777");
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
