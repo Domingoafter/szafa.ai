@@ -679,7 +679,13 @@ if (g.season && g.season !== "unknown") parts.push(g.season);
 
 const label = parts.join(" • ");
 
-      wardrobeState.push(label);
+      wardrobeState.push({
+  id: g.id,
+  name: g.name,
+  category: g.category,
+  color: g.color,
+  season: g.season,
+});
 
       const li = document.createElement("li");
       li.className = "garment-item";
