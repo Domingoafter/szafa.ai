@@ -148,13 +148,26 @@ app.post("/api/generate-outfit", async (req, res) => {
       description: "Dodaj najpierw ubrania, by wygenerować stylizację.",
       imageUrl: null,
       selectedItems: [],
+      occasion: "",
+      missing: "",
+      tip: "",
     });
   }
 
-  const wardrobeText = wardrobe
-    .map((item, index) => {
-      return `${index + 1}. ${item.name} | kategoria: ${item.category} | kolor: ${item.color} | sezon: ${item.season}`;
-    })
+  const wardrobeCatalog = wardrobe.map((item, index) => ({
+    index: index + 1,
+    id: item.id,
+    name: item.name || "unknown",
+    category: item.category || "unknown",
+    color: item.color || "unknown",
+    season: item.season || "unknown",
+  }));
+
+  const wardrobeText = wardrobeCatalog
+    .map(
+      (item) =>
+        `${item.index}. id=${item.id} | name=${item.name} | category=${item.category} | color=${item.color} | season=${item.season}`
+    )
     .join("\n");
 
   const preferencesText =
@@ -200,7 +213,7 @@ Jesteś wirtualną stylistką w aplikacji "Szafa AI".
 
 Tworzysz stylizację dla: ${genderText}.
 
-Masz do dyspozycji WYŁĄCZNIE te ubrania:
+MASZ UŻYĆ WYŁĄCZNIE ELEMENTÓW Z TEJ LISTY:
 ${wardrobeText}
 
 Preferencje użytkownika:
@@ -212,29 +225,23 @@ ${styleProfileText}
 Warunki pogodowe:
 ${weatherText}
 
-Twoje zadanie:
-1. Wybierz wyłącznie ubrania z listy.
-2. Nie wymyślaj nowych elementów.
-3. Dobierz spójną stylizację.
-4. Jeśli czegoś brakuje, wpisz to tylko w polu "missing".
-5. Odpowiedz WYŁĄCZNIE w czystym JSON-ie.
-6. Nie używaj markdowna.
+BARDZO WAŻNE ZASADY:
+- Nie wolno Ci wymyślać nowych ubrań.
+- Nie wolno Ci używać nazw ubrań spoza listy.
+- selectedItemIds musi zawierać wyłącznie ID z przekazanej listy.
+- Jeśli czegoś brakuje, napisz to tylko w polu "missing".
+- Odpowiedz WYŁĄCZNIE w czystym JSON-ie.
+- Bez markdowna.
+- Bez dodatkowych zdań poza JSON.
 
 Format odpowiedzi:
 {
-  "selectedItems": ["...", "..."],
+  "selectedItemIds": [1, 2],
   "description": "...",
   "occasion": "...",
   "missing": "...",
   "tip": "..."
 }
-
-Zasady:
-- selectedItems = nazwy ubrań dokładnie z przekazanej listy
-- description = 1-2 zdania po polsku
-- occasion = 1 krótkie zdanie
-- missing = krótka informacja, czego ewentualnie brakuje
-- tip = 1 krótka praktyczna wskazówka
 `.trim();
 
   try {
@@ -245,7 +252,7 @@ Zasady:
 
     const text =
       aiResponse.output_text ||
-      '{"selectedItems":[],"description":"Nie udało się wygenerować stylizacji.","occasion":"","missing":"","tip":""}';
+      '{"selectedItemIds":[],"description":"Nie udało się wygenerować stylizacji.","occasion":"","missing":"","tip":""}';
 
     let parsed;
 
@@ -257,12 +264,23 @@ Zasady:
         description: "AI zwróciło niepoprawny format odpowiedzi.",
         imageUrl: null,
         selectedItems: [],
+        occasion: "",
+        missing: "",
+        tip: "",
         raw: text,
       });
     }
 
+    const selectedIds = Array.isArray(parsed.selectedItemIds)
+      ? parsed.selectedItemIds
+      : [];
+
+    const selectedItems = wardrobeCatalog
+      .filter((item) => selectedIds.includes(item.id))
+      .map((item) => item.name);
+
     return res.json({
-      selectedItems: parsed.selectedItems || [],
+      selectedItems,
       description: parsed.description || "Brak opisu stylizacji.",
       occasion: parsed.occasion || "",
       missing: parsed.missing || "",
@@ -275,6 +293,9 @@ Zasady:
       description: "Wystąpił błąd po stronie AI. Spróbuj ponownie za chwilę.",
       imageUrl: null,
       selectedItems: [],
+      occasion: "",
+      missing: "",
+      tip: "",
     });
   }
 });
