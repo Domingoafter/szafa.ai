@@ -294,98 +294,99 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (analyzeImageButton) {
-    analyzeImageButton.addEventListener("click", async () => {
-      const files = wardrobeImagesInput.files;
+  analyzeImageButton.addEventListener("click", async () => {
+    const files = wardrobeImagesInput.files;
 
-      if (!files || files.length === 0) {
-        analyzeImageResult.textContent =
-          "Najpierw wgraj przynajmniej jedno zdjęcie ubrania.";
-        return;
+    if (!files || files.length === 0) {
+      analyzeImageResult.textContent =
+        "Najpierw wgraj przynajmniej jedno zdjęcie ubrania.";
+      return;
+    }
+
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      analyzeImageResult.textContent = "Najpierw zaloguj się przez Google.";
+      return;
+    }
+
+    const filesArray = Array.from(files);
+    let successCount = 0;
+    let failCount = 0;
+    const errors = [];
+
+    analyzeImageResult.textContent = `Analizuję ${filesArray.length} zdjęć...`;
+
+    for (const file of filesArray) {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/analyze-garment`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Błąd analizy zdjęcia: ${response.status} ${errText}`);
+        }
+
+        const data = await response.json();
+        console.log("ANALYZE GARMENT RESPONSE:", data);
+
+        const garmentName = data.name || "Nieznane ubranie";
+        const garmentCategory = data.category || "unknown";
+        const garmentColor = data.color || "unknown";
+        const garmentSeason = data.season || "unknown";
+
+        if (!garmentName) {
+          throw new Error("Backend nie zwrócił danych ubrania.");
+        }
+
+        const saveRes = await fetch(`${API_BASE}/api/garments`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({
+            name: garmentName,
+            category: garmentCategory,
+            color: garmentColor,
+            season: garmentSeason,
+          }),
+        });
+
+        if (!saveRes.ok) {
+          const saveErrText = await saveRes.text();
+          throw new Error(
+            `Błąd zapisu do garderoby: ${saveRes.status} ${saveErrText}`
+          );
+        }
+
+        const savedItem = await saveRes.json();
+        console.log("GARMENT SAVED:", savedItem);
+
+        successCount++;
+        analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
+      } catch (error) {
+        failCount++;
+        errors.push(error.message);
+        console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
       }
+    }
 
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        analyzeImageResult.textContent = "Najpierw zaloguj się przez Google.";
-        return;
-      }
+    await window.refreshWardrobe();
 
-      const filesArray = Array.from(files);
-      let successCount = 0;
-      let failCount = 0;
-      const errors = [];
-
-      analyzeImageResult.textContent = `Analizuję ${filesArray.length} zdjęć...`;
-
-      for (const file of filesArray) {
-        const formData = new FormData();
-        formData.append("image", file);
-
-        try {
-  const response = await fetch(`${API_BASE}/api/analyze-garment`, {
-    method: "POST",
-    body: formData,
+    if (successCount > 0 && failCount === 0) {
+      analyzeImageResult.textContent = `Gotowe! Zanalizowano i zapisano ${successCount} z ${filesArray.length} zdjęć.`;
+    } else if (successCount > 0 && failCount > 0) {
+      analyzeImageResult.textContent = `Częściowy sukces: zapisano ${successCount} z ${filesArray.length} zdjęć. Błędy: ${errors.join(" | ")}`;
+    } else {
+      analyzeImageResult.textContent = `Nie udało się zapisać żadnego zdjęcia. Błędy: ${errors.join(" | ")}`;
+    }
   });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Błąd analizy zdjęcia: ${response.status} ${errText}`);
-  }
-
-  const data = await response.json();
-  console.log("ANALYZE GARMENT RESPONSE:", data);
-
-  const garmentName = data.name || "Nieznane ubranie";
-  const garmentCategory = data.category || "unknown";
-  const garmentColor = data.color || "unknown";
-  const garmentSeason = data.season || "unknown";
-
-  if (!garmentName) {
-    throw new Error("Backend nie zwrócił danych ubrania.");
-  }
-
-  const saveRes = await fetch(`${API_BASE}/api/garments`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token,
-    },
-    body: JSON.stringify({
-      name: garmentName,
-      category: garmentCategory,
-      color: garmentColor,
-      season: garmentSeason,
-    }),
-  });
-
-  if (!saveRes.ok) {
-    const saveErrText = await saveRes.text();
-    throw new Error(
-      `Błąd zapisu do garderoby: ${saveRes.status} ${saveErrText}`
-    );
-  }
-
-  const savedItem = await saveRes.json();
-  console.log("GARMENT SAVED:", savedItem);
-
-  successCount++;
-  analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
-} catch (error) {
-  failCount++;
-  errors.push(error.message);
-  console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
 }
-
-      await window.refreshWardrobe();
-
-      if (successCount > 0 && failCount === 0) {
-        analyzeImageResult.textContent = `Gotowe! Zanalizowano i zapisano ${successCount} z ${filesArray.length} zdjęć.`;
-      } else if (successCount > 0 && failCount > 0) {
-        analyzeImageResult.textContent = `Częściowy sukces: zapisano ${successCount} z ${filesArray.length} zdjęć. Błędy: ${errors.join(" | ")}`;
-      } else {
-        analyzeImageResult.textContent = `Nie udało się zapisać żadnego zdjęcia. Błędy: ${errors.join(" | ")}`;
-      }
-    });
-  }
 
   if (preferencesForm) {
     preferencesForm.addEventListener("submit", (event) => {
