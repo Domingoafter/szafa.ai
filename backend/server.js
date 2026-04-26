@@ -1,143 +1,37 @@
-// Wczytujemy zmienne z pliku .env (w tym OPENAI_API_KEY)
-const { pool } = require("./db");
-const requireAuth = require("./requireAuth");
+// 🔹 Walidacja logiki outfitu
+function validateOutfit(selectedItems) {
+  const categories = selectedItems.map((item) => item.category);
 
-require("dotenv").config();
+  const hasDress = categories.includes("dress");
+  const hasBottom = categories.includes("bottom");
+  const hasTop = categories.includes("top");
 
-const path = require("path");
-const express = require("express");
-const cors = require("cors");
-const multer = require("multer");
-const OpenAI = require("openai");
+  const bottomCount = categories.filter((c) => c === "bottom").length;
+  const topCount = categories.filter((c) => c === "top").length;
+  const dressCount = categories.filter((c) => c === "dress").length;
+  const outerwearCount = categories.filter((c) => c === "outerwear").length;
 
-const upload = multer({ storage: multer.memoryStorage() });
-const app = express();
+  const errors = [];
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-// Serwujemy pliki frontendu (index.html, style.css, script.js) z katalogu głównego projektu
-app.use(express.static(path.join(__dirname, "public")));
+  if (hasDress && hasBottom)
+    errors.push("Sukienka nie może być łączona ze spódnicą lub spodniami.");
+  if (hasDress && hasTop)
+    errors.push("Sukienka nie może być łączona z topem lub koszulą.");
+  if (bottomCount > 1)
+    errors.push("Nie można wybrać dwóch elementów z kategorii bottom.");
+  if (topCount > 1)
+    errors.push("Nie można wybrać dwóch elementów z kategorii top.");
+  if (dressCount > 1)
+    errors.push("Nie można wybrać dwóch sukienek.");
+  if (outerwearCount > 1)
+    errors.push("Nie można wybrać dwóch okryć wierzchnich.");
 
-// Klient OpenAI – używa klucza z .env
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+  // Musi być albo sukienka, albo top + bottom
+  if (!hasDress && !hasBottom && !hasTop)
+    errors.push("Outfit musi zawierać top + bottom lub sukienkę.");
 
-// 🔹 Prosty endpoint testowy – do sprawdzenia backendu
-app.get("/api/test", (req, res) => {
-  res.json({ message: "Backend działa!" });
-});
-
-// 🔹 Endpoint do analizy jednego zdjęcia (AI Vision – prawdziwy opis)
-app.post("/api/analyze-image", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "Brak zdjęcia do analizy" });
-  }
-
-  try {
-    const base64Image = req.file.buffer.toString("base64");
-    const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
-
-    const prompt = `
-Opisz jedno główne ubranie widoczne na zdjęciu.
-
-Zasady:
-- pisz tylko o tym, co naprawdę widać,
-- nie zgaduj,
-- jeśli coś jest niepewne, pomiń to,
-- odpowiedz jednym krótkim zdaniem po polsku.
-
-Format:
-kolor + typ ubrania + ewentualnie materiał/fason + ewentualnie sezon/styl
-
-Przykład:
-"czarna skórzana kurtka, styl rockowy"
-`.trim();
-
-    const aiResponse = await openai.responses.create({
-      model: "gpt-4o-mini",
-      input: [
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: prompt },
-            { type: "input_image", image_url: imageUrl },
-          ],
-        },
-      ],
-    });
-
-    const text =
-      aiResponse.output_text || "Nie udało się odczytać opisu ubrania.";
-
-    return res.json({
-      description: text,
-    });
-  } catch (error) {
-    console.error("Błąd przy analizie zdjęcia:", error);
-    return res.status(500).json({
-      error: "Nie udało się przeanalizować zdjęcia.",
-    });
-  }
-});
-
-// 🔹 Endpoint do analizy inspiracji (zdjęcia stylu)
-app.post(
-  "/api/analyze-style-images",
-  upload.array("images", 5),
-  async (req, res) => {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "Brak zdjęć inspiracji" });
-    }
-
-    try {
-      const firstFile = req.files[0];
-      const base64Image = firstFile.buffer.toString("base64");
-      const imageUrl = `data:${firstFile.mimetype};base64,${base64Image}`;
-
-      const prompt = `
-Na podstawie przesłanego zdjęcia inspiracji opisz styl, kolorystykę i vibe użytkowniczki.
-
-Napisz po polsku, zwięźle, w kilku krótkich częściach:
-
-1) STYL / VIBE – 1–2 zdania.
-2) KOLORYSTYKA – 1–2 zdania.
-3) FASONY – 1–2 zdania.
-4) OKAZJE – 1–2 zdania.
-
-Bez emoji, bez nagłówków typu "Odpowiedź:".
-      `.trim();
-
-      const aiResponse = await openai.responses.create({
-        model: "gpt-4o-mini",
-        input: [
-          {
-            role: "user",
-            content: [
-              { type: "input_text", text: prompt },
-              { type: "input_image", image_url: imageUrl },
-            ],
-          },
-        ],
-      });
-
-      const text =
-        aiResponse.output_text ||
-        "Nie udało się odczytać stylu z inspiracji.";
-
-      return res.json({
-        styleProfile: text,
-      });
-    } catch (error) {
-      console.error("Błąd przy analizie inspiracji:", error);
-      return res.status(500).json({
-        styleProfile:
-          "Nie udało się przeanalizować inspiracji. Spróbuj ponownie później.",
-      });
-    }
-  }
-);
+  return errors;
+}
 
 // 🔹 Endpoint z AI – generowanie stylizacji
 app.post("/api/generate-outfit", async (req, res) => {
@@ -154,8 +48,18 @@ app.post("/api/generate-outfit", async (req, res) => {
     });
   }
 
-  const wardrobeCatalog = wardrobe.map((item, index) => ({
-    index: index + 1,
+  // Podział garderoby na kategorie
+  const byCategory = {
+    tops: wardrobe.filter((i) => i.category === "top"),
+    bottoms: wardrobe.filter((i) => i.category === "bottom"),
+    dresses: wardrobe.filter((i) => i.category === "dress"),
+    outerwear: wardrobe.filter((i) => i.category === "outerwear"),
+    shoes: wardrobe.filter((i) => i.category === "shoes"),
+    bags: wardrobe.filter((i) => i.category === "bag"),
+    accessories: wardrobe.filter((i) => i.category === "accessory"),
+  };
+
+  const wardrobeCatalog = wardrobe.map((item) => ({
     id: item.id,
     name: item.name || "unknown",
     category: item.category || "unknown",
@@ -163,78 +67,92 @@ app.post("/api/generate-outfit", async (req, res) => {
     season: item.season || "unknown",
   }));
 
-  const wardrobeText = wardrobeCatalog
-    .map(
-      (item) =>
-        `${item.index}. id=${item.id} | name=${item.name} | category=${item.category} | color=${item.color} | season=${item.season}`
-    )
-    .join("\n");
+  const formatList = (items) =>
+    items.length > 0
+      ? items.map((i) => `  id=${i.id} | ${i.name} | ${i.color} | ${i.season}`).join("\n")
+      : "  (brak)";
+
+  const wardrobeText = `
+TOPS (góry):
+${formatList(byCategory.tops)}
+
+BOTTOMS (doły):
+${formatList(byCategory.bottoms)}
+
+DRESSES (sukienki):
+${formatList(byCategory.dresses)}
+
+OUTERWEAR (okrycia wierzchnie):
+${formatList(byCategory.outerwear)}
+
+SHOES (buty):
+${formatList(byCategory.shoes)}
+
+BAGS (torebki):
+${formatList(byCategory.bags)}
+
+ACCESSORIES (dodatki):
+${formatList(byCategory.accessories)}
+`.trim();
+
+  const genderText = gender === "male" ? "mężczyzna" : gender === "female" ? "kobieta" : "osoba";
 
   const preferencesText =
-    preferences && preferences.length > 0
-      ? preferences.join(", ")
-      : "brak szczególnych preferencji";
+    preferences?.length > 0 ? preferences.join(", ") : "brak szczególnych preferencji";
 
   const styleProfileText =
-    styleProfile && styleProfile.length > 0
-      ? styleProfile
-      : "brak analizy inspiracji";
-
-  const genderText =
-    gender === "male"
-      ? "mężczyzna"
-      : gender === "female"
-      ? "kobieta"
-      : "osoba";
+    styleProfile?.length > 0 ? styleProfile : "brak analizy inspiracji";
 
   let weatherText = "brak informacji o pogodzie";
-
   if (weather) {
     const parts = [];
-
-    if (
-      typeof weather.temperatureC === "number" &&
-      !Number.isNaN(weather.temperatureC)
-    ) {
+    if (typeof weather.temperatureC === "number" && !Number.isNaN(weather.temperatureC))
       parts.push(`temperatura około ${weather.temperatureC}°C`);
-    }
+    if (weather.condition) parts.push(`warunki: ${weather.condition}`);
+    if (parts.length > 0) weatherText = parts.join(", ");
+  }
 
-    if (weather.condition) {
-      parts.push(`warunki: ${weather.condition}`);
-    }
+  const hasDresses = byCategory.dresses.length > 0;
+  const hasTopsAndBottoms = byCategory.tops.length > 0 && byCategory.bottoms.length > 0;
 
-    if (parts.length > 0) {
-      weatherText = parts.join(", ");
-    }
+  let outfitRule = "";
+  if (hasDresses && hasTopsAndBottoms) {
+    outfitRule = `REGUŁA OUTFITU: Wybierz ALBO jedną sukienkę z kategorii DRESSES, ALBO jeden top z TOPS + jeden bottom z BOTTOMS. Nigdy nie mieszaj sukienki z topem lub bottomem.`;
+  } else if (hasDresses) {
+    outfitRule = `REGUŁA OUTFITU: Wybierz jedną sukienkę z kategorii DRESSES.`;
+  } else if (hasTopsAndBottoms) {
+    outfitRule = `REGUŁA OUTFITU: Wybierz jeden top z TOPS + jeden bottom z BOTTOMS.`;
+  } else {
+    outfitRule = `REGUŁA OUTFITU: Wybierz dostępne elementy. Jeśli brakuje kluczowych części outfitu, napisz to w polu "missing".`;
   }
 
   const prompt = `
 Jesteś wirtualną stylistką w aplikacji "Szafa AI".
-
 Tworzysz stylizację dla: ${genderText}.
 
-MASZ UŻYĆ WYŁĄCZNIE ELEMENTÓW Z TEJ LISTY:
+${outfitRule}
+
+Możesz DODATKOWO dodać (opcjonalnie, max 1 z każdej):
+- okrycie wierzchnie z OUTERWEAR (jeśli pasuje do pogody)
+- buty z SHOES
+- torebkę z BAGS
+- dodatek z ACCESSORIES
+
+GARDEROBA:
 ${wardrobeText}
 
-Preferencje użytkownika:
-${preferencesText}
+Preferencje: ${preferencesText}
+Styl z inspiracji: ${styleProfileText}
+Pogoda: ${weatherText}
 
-Styl z inspiracji:
-${styleProfileText}
+ZASADY:
+- Używaj WYŁĄCZNIE ID z powyższej listy.
+- Nie wymyślaj ubrań spoza listy.
+- selectedItemIds = tablica ID wybranych ubrań.
+- Jeśli czegoś brakuje do kompletnego outfitu, napisz w "missing".
+- Odpowiedz WYŁĄCZNIE czystym JSON, bez markdowna.
 
-Warunki pogodowe:
-${weatherText}
-
-BARDZO WAŻNE ZASADY:
-- Nie wolno Ci wymyślać nowych ubrań.
-- Nie wolno Ci używać nazw ubrań spoza listy.
-- selectedItemIds musi zawierać wyłącznie ID z przekazanej listy.
-- Jeśli czegoś brakuje, napisz to tylko w polu "missing".
-- Odpowiedz WYŁĄCZNIE w czystym JSON-ie.
-- Bez markdowna.
-- Bez dodatkowych zdań poza JSON.
-
-Format odpowiedzi:
+Format:
 {
   "selectedItemIds": [1, 2],
   "description": "...",
@@ -255,7 +173,6 @@ Format odpowiedzi:
       '{"selectedItemIds":[],"description":"Nie udało się wygenerować stylizacji.","occasion":"","missing":"","tip":""}';
 
     let parsed;
-
     try {
       parsed = JSON.parse(text);
     } catch (parseError) {
@@ -271,13 +188,30 @@ Format odpowiedzi:
       });
     }
 
-    const selectedIds = Array.isArray(parsed.selectedItemIds)
-      ? parsed.selectedItemIds
-      : [];
+    const selectedIds = Array.isArray(parsed.selectedItemIds) ? parsed.selectedItemIds : [];
 
-    const selectedItems = wardrobeCatalog
-      .filter((item) => selectedIds.includes(item.id))
-      .map((item) => item.name);
+    // Mapujemy ID → obiekty
+    const selectedItemObjects = wardrobeCatalog.filter((item) =>
+      selectedIds.includes(item.id)
+    );
+
+    // ✅ Walidacja logiki outfitu po stronie backendu
+    const validationErrors = validateOutfit(selectedItemObjects);
+
+    if (validationErrors.length > 0) {
+      console.warn("Walidacja outfitu nie przeszła:", validationErrors);
+      return res.status(422).json({
+        description: "AI wygenerowało niepoprawną stylizację. Spróbuj ponownie.",
+        imageUrl: null,
+        selectedItems: [],
+        occasion: "",
+        missing: validationErrors.join(" "),
+        tip: "Spróbuj ponownie – AI dobierze lepszą kombinację.",
+        validationErrors,
+      });
+    }
+
+    const selectedItems = selectedItemObjects.map((item) => item.name);
 
     return res.json({
       selectedItems,
@@ -298,281 +232,4 @@ Format odpowiedzi:
       tip: "",
     });
   }
-});
-
-// 🔹 Nowy endpoint – analiza braków w szafie
-app.post("/api/wardrobe-gaps", async (req, res) => {
-  const { wardrobe } = req.body;
-
-  if (!wardrobe || wardrobe.length === 0) {
-    return res.status(400).json({
-      gaps: "Brak ubrań – nie można przeprowadzić analizy braków.",
-    });
-  }
-
-  const wardrobeText = wardrobe.join("; ");
-
-  const prompt = `
-Jesteś profesjonalną wirtualną stylistką w aplikacji modowej.
-Twoim zadaniem jest przeanalizowanie garderoby użytkowniczki i wskazanie braków.
-
-GARDEROBA:
-${wardrobeText}
-
-OCEŃ:
-1. Jakich kluczowych elementów brakuje w szafie?
-2. Podziel braki na przejrzyste kategorie.
-3. Dla każdej kategorii wypisz 2–4 propozycje elementów.
-4. Pisz po polsku, krótko i konkretnie.
-
-FORMAT ODPOWIEDZI:
-BRAKI W SZAFIE:
-- punktowo
-
-KATEGORIE:
-- Kategoria: propozycje
-
-SUGESTIE ZAKUPOWE:
-- ogólne wskazówki
-`;
-
-  try {
-    const aiResponse = await openai.responses.create({
-      model: "gpt-4o-mini",
-      input: prompt,
-    });
-
-    const text =
-      aiResponse.output?.[0]?.content?.[0]?.text ||
-      "Nie udało się przeanalizować braków.";
-
-    return res.json({
-      gaps: text,
-    });
-  } catch (error) {
-    console.error("Błąd przy analizie braków:", error);
-    return res.status(500).json({
-      gaps: "Wystąpił błąd podczas analizy braków.",
-    });
-  }
-});
-
-// 🔹 Propozycje zakupów – na razie: linki do wyszukiwarki Reserved
-app.post("/api/shop-suggestions", (req, res) => {
-  const { gaps, budgetPerItem, currency, preferredStore } = req.body;
-
-  if (!gaps || !Array.isArray(gaps) || gaps.length === 0) {
-    return res
-      .status(400)
-      .json({ error: "Brak listy braków w szafie (gaps)." });
-  }
-
-  const store = preferredStore || "Reserved";
-  const curr = currency || "PLN";
-  const baseSearchUrl = "https://www.reserved.com/pl/pl/search?searchPhrase=";
-
-  const suggestions = gaps.map((gap) => {
-    const query = encodeURIComponent(gap);
-    const searchUrl = `${baseSearchUrl}${query}`;
-
-    return {
-      gap,
-      store,
-      approxPrice: budgetPerItem || null,
-      currency: curr,
-      searchUrl,
-      note:
-        "To jest link do wyszukiwania w Reserved na podstawie tego, czego szukasz. Możesz go doprecyzować bezpośrednio na stronie sklepu.",
-    };
-  });
-
-  return res.json({ suggestions });
-});
-
-// Fallback: jeśli ktoś wejdzie na "/" i statyczne pliki nie zadziałają,
-// wyślij po prostu index.html
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "index.html"));
-});
-
-app.get("/api/me", requireAuth, async (req, res) => {
-  try {
-    await pool.query(
-      `insert into users (id, email)
-       values ($1, $2)
-       on conflict (id) do update set email = excluded.email`,
-      [req.user.uid, req.user.email || null]
-    );
-
-    res.json({ uid: req.user.uid, email: req.user.email });
-  } catch (error) {
-    console.error("Błąd GET /api/me:", error);
-    res.status(500).json({
-      error: "Nie udało się zsynchronizować użytkownika",
-      details: error.message,
-    });
-  }
-});
-
-// Uruchamiamy serwer
-const PORT = process.env.PORT || 3001;
-
-app.post("/api/garments", requireAuth, async (req, res) => {
-  try {
-    const { name, category, color, season } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: "Brak nazwy" });
-    }
-
-    // upewnij się, że user istnieje w tabeli users
-    await pool.query(
-      `insert into users (id, email)
-       values ($1, $2)
-       on conflict (id) do update set email = excluded.email`,
-      [req.user.uid, req.user.email || null]
-    );
-
-    const result = await pool.query(
-      `insert into garments (user_id, name, category, color, season)
-       values ($1, $2, $3, $4, $5)
-       returning *`,
-      [req.user.uid, name, category || null, color || null, season || null]
-    );
-
-    return res.json(result.rows[0]);
-  } catch (error) {
-    console.error("Błąd POST /api/garments:", error);
-    return res.status(500).json({
-      error: "Nie udało się zapisać ubrania",
-      details: error.message,
-    });
-  }
-});
-
-app.get("/api/garments", requireAuth, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `select * from garments where user_id = $1 order by created_at desc`,
-      [req.user.uid]
-    );
-
-    return res.json(result.rows);
-  } catch (error) {
-    console.error("Błąd GET /api/garments:", error);
-    return res.status(500).json({
-      error: "Nie udało się pobrać garderoby",
-      details: error.message,
-    });
-  }
-});
-app.post("/api/analyze-garment", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "Brak zdjęcia ubrania" });
-  }
-
-  try {
-    const base64Image = req.file.buffer.toString("base64");
-    const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
-
-    const prompt = `
-Przeanalizuj jedno główne ubranie widoczne na zdjęciu.
-
-Zwróć odpowiedź WYŁĄCZNIE w czystym JSON-ie, bez dodatkowego tekstu.
-Nie używaj markdowna.
-Nie zgaduj, jeśli czegoś nie widać.
-
-Format odpowiedzi:
-{
-  "name": "...",
-  "category": "...",
-  "color": "...",
-  "season": "..."
-}
-
-Zasady:
-- name = krótka naturalna nazwa ubrania po polsku, np. "biała koszula oversize", "czarne jeansy", "beżowy płaszcz"
-- category = jedna z wartości:
-  "top", "bottom", "outerwear", "dress", "shoes", "bag", "accessory", "unknown"
-- color = główny kolor po polsku, np. "biały", "czarny", "beżowy", "granatowy"
-- season = jedna z wartości:
-  "spring", "summer", "autumn", "winter", "all-season", "unknown"
-- jeśli czegoś nie da się określić, wpisz "unknown"
-`.trim();
-
-    const aiResponse = await openai.responses.create({
-      model: "gpt-4o-mini",
-      input: [
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: prompt },
-            { type: "input_image", image_url: imageUrl },
-          ],
-        },
-      ],
-    });
-
-    const text =
-      aiResponse.output_text || '{"category":"nieznane","color":"nieznany","description":"Nie udało się przeanalizować ubrania."}';
-
-    let parsed;
-
-    try {
-      parsed = JSON.parse(text);
-    } catch (parseError) {
-      console.error("Nie udało się sparsować JSON z AI:", text);
-      return res.status(500).json({
-        error: "AI zwróciło niepoprawny format odpowiedzi",
-        raw: text,
-      });
-    }
-
-    return res.json({
-  name: parsed.name || "Nieznane ubranie",
-  category: parsed.category || "unknown",
-  color: parsed.color || "unknown",
-  season: parsed.season || "unknown",
-});
-  } catch (error) {
-    console.error("Błąd przy analizie ubrania:", error);
-    return res.status(500).json({
-      error: "Nie udało się przeanalizować ubrania.",
-    });
-  }
-});
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend działa' });
-});
-// DELETE garment
-app.delete("/api/garments/:id", requireAuth, async (req, res) => {
-  try {
-    const garmentId = req.params.id;
-    const userId = req.user.uid;
-
-    const result = await pool.query(
-      `
-      DELETE FROM garments
-      WHERE id = $1 AND user_id = $2
-      RETURNING *
-      `,
-      [garmentId, userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Garment not found" });
-    }
-
-    res.json({
-      success: true,
-      deleted: result.rows[0]
-    });
-
-  } catch (error) {
-    console.error("DELETE GARMENT ERROR:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Serwer działa na porcie ${PORT}`);
 });

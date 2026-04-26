@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
       analyzeStyleResult.textContent = savedStyleProfile;
     } else {
       analyzeStyleResult.textContent =
-        'Brak analizy – wgraj inspiracje i kliknij „Przeanalizuj inspiracje”.';
+        'Brak analizy – wgraj inspiracje i kliknij „Przeanalizuj inspiracje".';
     }
 
     const savedStyleImagesJson = localStorage.getItem(STYLE_IMAGES_KEY);
@@ -287,106 +287,108 @@ document.addEventListener("DOMContentLoaded", () => {
       styleImagesDataUrls = [];
       currentStyleProfile = "";
       analyzeStyleResult.textContent =
-        'Brak analizy – wgraj inspiracje i kliknij „Przeanalizuj inspiracje”.';
+        'Brak analizy – wgraj inspiracje i kliknij „Przeanalizuj inspiracje".';
       localStorage.removeItem(STYLE_IMAGES_KEY);
       localStorage.removeItem(STYLE_PROFILE_KEY);
     });
   }
 
   if (analyzeImageButton) {
-  analyzeImageButton.addEventListener("click", async () => {
-    const files = wardrobeImagesInput.files;
+    analyzeImageButton.addEventListener("click", async () => {
+      const files = wardrobeImagesInput.files;
 
-    if (!files || files.length === 0) {
-      analyzeImageResult.textContent =
-        "Najpierw wgraj przynajmniej jedno zdjęcie ubrania.";
-      return;
-    }
-
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      analyzeImageResult.textContent = "Najpierw zaloguj się przez Google.";
-      return;
-    }
-
-    const filesArray = Array.from(files);
-    let successCount = 0;
-    let failCount = 0;
-    const errors = [];
-
-    analyzeImageResult.textContent = `Analizuję ${filesArray.length} zdjęć...`;
-
-    for (const file of filesArray) {
-      const formData = new FormData();
-      formData.append("image", file);
-
-      try {
-        const response = await fetch(`${API_BASE}/api/analyze-garment`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Błąd analizy zdjęcia: ${response.status} ${errText}`);
-        }
-
-        const data = await response.json();
-        console.log("ANALYZE GARMENT RESPONSE:", data);
-
-        const garmentName = data.name || "Nieznane ubranie";
-        const garmentCategory = data.category || "unknown";
-        const garmentColor = data.color || "unknown";
-        const garmentSeason = data.season || "unknown";
-
-        if (!garmentName) {
-          throw new Error("Backend nie zwrócił danych ubrania.");
-        }
-
-        const saveRes = await fetch(`${API_BASE}/api/garments`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-          body: JSON.stringify({
-            name: garmentName,
-            category: garmentCategory,
-            color: garmentColor,
-            season: garmentSeason,
-          }),
-        });
-
-        if (!saveRes.ok) {
-          const saveErrText = await saveRes.text();
-          throw new Error(
-            `Błąd zapisu do garderoby: ${saveRes.status} ${saveErrText}`
-          );
-        }
-
-        const savedItem = await saveRes.json();
-        console.log("GARMENT SAVED:", savedItem);
-
-        successCount++;
-        analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
-      } catch (error) {
-        failCount++;
-        errors.push(error.message);
-        console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
+      if (!files || files.length === 0) {
+        analyzeImageResult.textContent =
+          "Najpierw wgraj przynajmniej jedno zdjęcie ubrania.";
+        return;
       }
-    }
 
-    await window.refreshWardrobe();
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        analyzeImageResult.textContent = "Najpierw zaloguj się przez Google.";
+        return;
+      }
 
-    if (successCount > 0 && failCount === 0) {
-      analyzeImageResult.textContent = `Gotowe! Zanalizowano i zapisano ${successCount} z ${filesArray.length} zdjęć.`;
-    } else if (successCount > 0 && failCount > 0) {
-      analyzeImageResult.textContent = `Częściowy sukces: zapisano ${successCount} z ${filesArray.length} zdjęć. Błędy: ${errors.join(" | ")}`;
-    } else {
-      analyzeImageResult.textContent = `Nie udało się zapisać żadnego zdjęcia. Błędy: ${errors.join(" | ")}`;
-    }
-  });
-}
+      const filesArray = Array.from(files);
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
+
+      analyzeImageResult.textContent = `Analizuję ${filesArray.length} zdjęć...`;
+
+      for (const file of filesArray) {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        try {
+          const response = await fetch(`${API_BASE}/api/analyze-garment`, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(
+              `Błąd analizy zdjęcia: ${response.status} ${errText}`
+            );
+          }
+
+          const data = await response.json();
+          console.log("ANALYZE GARMENT RESPONSE:", data);
+
+          const garmentName = data.name || "Nieznane ubranie";
+          const garmentCategory = data.category || "unknown";
+          const garmentColor = data.color || "unknown";
+          const garmentSeason = data.season || "unknown";
+
+          if (!garmentName) {
+            throw new Error("Backend nie zwrócił danych ubrania.");
+          }
+
+          const saveRes = await fetch(`${API_BASE}/api/garments`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + token,
+            },
+            body: JSON.stringify({
+              name: garmentName,
+              category: garmentCategory,
+              color: garmentColor,
+              season: garmentSeason,
+            }),
+          });
+
+          if (!saveRes.ok) {
+            const saveErrText = await saveRes.text();
+            throw new Error(
+              `Błąd zapisu do garderoby: ${saveRes.status} ${saveErrText}`
+            );
+          }
+
+          const savedItem = await saveRes.json();
+          console.log("GARMENT SAVED:", savedItem);
+
+          successCount++;
+          analyzeImageResult.textContent = `Zanalizowano ${successCount} z ${filesArray.length} zdjęć...`;
+        } catch (error) {
+          failCount++;
+          errors.push(error.message);
+          console.error("Błąd podczas analizy / zapisu zdjęcia:", error);
+        }
+      }
+
+      await window.refreshWardrobe();
+
+      if (successCount > 0 && failCount === 0) {
+        analyzeImageResult.textContent = `Gotowe! Zanalizowano i zapisano ${successCount} z ${filesArray.length} zdjęć.`;
+      } else if (successCount > 0 && failCount > 0) {
+        analyzeImageResult.textContent = `Częściowy sukces: zapisano ${successCount} z ${filesArray.length} zdjęć. Błędy: ${errors.join(" | ")}`;
+      } else {
+        analyzeImageResult.textContent = `Nie udało się zapisać żadnego zdjęcia. Błędy: ${errors.join(" | ")}`;
+      }
+    });
+  }
 
   if (preferencesForm) {
     preferencesForm.addEventListener("submit", (event) => {
@@ -405,33 +407,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (generateButton) {
-    generateButton.addEventListener("click", () => {
-      const wardrobeItems = [...wardrobeState];
+  // ✅ Funkcja generująca stylizację – wydzielona, żeby móc ją ponowić
+  async function generateOutfit() {
+    const wardrobeItems = [...wardrobeState];
 
-      const preferences = Array.from(
-        preferencesList.querySelectorAll("li")
-      ).map((li) => li.textContent);
+    const preferences = Array.from(
+      preferencesList.querySelectorAll("li")
+    ).map((li) => li.textContent);
 
-      const tempValue = weatherTempInput.value.trim();
-      const conditionValue = weatherConditionSelect.value;
+    const tempValue = weatherTempInput ? weatherTempInput.value.trim() : "";
+    const conditionValue = weatherConditionSelect
+      ? weatherConditionSelect.value
+      : null;
 
-      const weather = {
-        temperatureC: tempValue !== "" ? Number(tempValue) : null,
-        condition: conditionValue || null,
-      };
+    const weather = {
+      temperatureC: tempValue !== "" ? Number(tempValue) : null,
+      condition: conditionValue || null,
+    };
 
-      if (wardrobeItems.length === 0) {
-        aiOutput.innerHTML =
-          "<p>Dodaj najpierw kilka ubrań do swojej garderoby, żeby wygenerować stylizację.</p>";
-        aiImageArea.innerHTML = "";
-        return;
-      }
-
-      aiOutput.innerHTML = "<p>Generuję stylizację...</p>";
+    if (wardrobeItems.length === 0) {
+      aiOutput.innerHTML =
+        "<p>Dodaj najpierw kilka ubrań do swojej garderoby, żeby wygenerować stylizację.</p>";
       aiImageArea.innerHTML = "";
+      return;
+    }
 
-      fetch(`${API_BASE}/api/generate-outfit`, {
+    aiOutput.innerHTML = "<p>Generuję stylizację...</p>";
+    aiImageArea.innerHTML = "";
+
+    try {
+      const response = await fetch(`${API_BASE}/api/generate-outfit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -442,39 +447,63 @@ document.addEventListener("DOMContentLoaded", () => {
           styleProfile: currentStyleProfile,
           weather,
         }),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          aiOutput.innerHTML = `
-  <h3>Stylizacja na dziś</h3>
-  <p><strong>Opis:</strong> ${data.description || "-"}</p>
-  <p><strong>Wybrane ubrania:</strong> ${
-    data.selectedItems && data.selectedItems.length > 0
-      ? data.selectedItems.join(", ")
-      : "Brak"
-  }</p>
-  <p><strong>Okazja:</strong> ${data.occasion || "-"}</p>
-  <p><strong>Braki:</strong> ${data.missing || "-"}</p>
-  <p><strong>Tip:</strong> ${data.tip || "-"}</p>
-`;
+      });
 
-          if (data.imageUrl) {
-            aiImageArea.innerHTML = `
-              <img src="${data.imageUrl}" alt="Stylizacja z AI" style="max-width:100%; border-radius:8px;" />
-            `;
-          } else {
-            aiImageArea.innerHTML = `
-              <p class="placeholder-text">
-                Na razie generujemy tylko opis stylizacji. Obrazy z AI dodamy w kolejnym etapie.
-              </p>
-            `;
-          }
-        })
-        .catch((error) => {
-          console.error("Błąd podczas wywołania backendu:", error);
-          aiOutput.innerHTML =
-            "<p>Wystąpił błąd podczas generowania stylizacji. Spróbuj ponownie.</p>";
-        });
+      const data = await response.json();
+
+      // ✅ Obsługa błędu walidacji outfitu (422) – AI wygenerowało nielogiczny zestaw
+      if (response.status === 422) {
+        aiOutput.innerHTML = `
+          <p>⚠️ AI wygenerowało niepoprawną stylizację. Kliknij „Spróbuj ponownie".</p>
+          <p><small>${data.missing || ""}</small></p>
+          <button id="retry-outfit-button" style="margin-top:8px; padding:8px 16px; cursor:pointer;">
+            🔄 Spróbuj ponownie
+          </button>
+        `;
+        document
+          .getElementById("retry-outfit-button")
+          ?.addEventListener("click", () => {
+            generateOutfit();
+          });
+        aiImageArea.innerHTML = "";
+        return;
+      }
+
+      // ✅ Normalny sukces
+      aiOutput.innerHTML = `
+        <h3>Stylizacja na dziś</h3>
+        <p><strong>Opis:</strong> ${data.description || "-"}</p>
+        <p><strong>Wybrane ubrania:</strong> ${
+          data.selectedItems && data.selectedItems.length > 0
+            ? data.selectedItems.join(", ")
+            : "Brak"
+        }</p>
+        <p><strong>Okazja:</strong> ${data.occasion || "-"}</p>
+        <p><strong>Braki:</strong> ${data.missing || "-"}</p>
+        <p><strong>Tip:</strong> ${data.tip || "-"}</p>
+      `;
+
+      if (data.imageUrl) {
+        aiImageArea.innerHTML = `
+          <img src="${data.imageUrl}" alt="Stylizacja z AI" style="max-width:100%; border-radius:8px;" />
+        `;
+      } else {
+        aiImageArea.innerHTML = `
+          <p class="placeholder-text">
+            Na razie generujemy tylko opis stylizacji. Obrazy z AI dodamy w kolejnym etapie.
+          </p>
+        `;
+      }
+    } catch (error) {
+      console.error("Błąd podczas wywołania backendu:", error);
+      aiOutput.innerHTML =
+        "<p>Wystąpił błąd podczas generowania stylizacji. Spróbuj ponownie.</p>";
+    }
+  }
+
+  if (generateButton) {
+    generateButton.addEventListener("click", () => {
+      generateOutfit();
     });
   }
 
@@ -597,7 +626,10 @@ document.addEventListener("DOMContentLoaded", () => {
             .join("");
         })
         .catch((error) => {
-          console.error("Błąd podczas pobierania propozycji z Reserved:", error);
+          console.error(
+            "Błąd podczas pobierania propozycji z Reserved:",
+            error
+          );
           shopResults.innerHTML = `
             <p class="small-explainer">
               Wystąpił błąd podczas pobierania propozycji. Spróbuj ponownie za chwilę.
@@ -681,19 +713,19 @@ document.addEventListener("DOMContentLoaded", () => {
     items.forEach((g) => {
       const parts = [g.name];
 
-if (g.color && g.color !== "unknown") parts.push(g.color);
-if (g.category && g.category !== "unknown") parts.push(g.category);
-if (g.season && g.season !== "unknown") parts.push(g.season);
+      if (g.color && g.color !== "unknown") parts.push(g.color);
+      if (g.category && g.category !== "unknown") parts.push(g.category);
+      if (g.season && g.season !== "unknown") parts.push(g.season);
 
-const label = parts.join(" • ");
+      const label = parts.join(" • ");
 
       wardrobeState.push({
-  id: g.id,
-  name: g.name,
-  category: g.category,
-  color: g.color,
-  season: g.season,
-});
+        id: g.id,
+        name: g.name,
+        category: g.category,
+        color: g.color,
+        season: g.season,
+      });
 
       const li = document.createElement("li");
       li.className = "garment-item";
